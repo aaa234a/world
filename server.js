@@ -2958,16 +2958,29 @@ app.post("/api/postChatMessage", async (req, res) => {
 // GET /api/getAvailableNationalFocuses
 app.get("/api/getAvailableNationalFocuses", async (req, res) => {
   const userIp = req.userIp;
-  if (!userIp)
-    return res.status(401).json({
-      success: false,
-      message: "IPアドレスが取得できません。",
+  if (!userIp) {
+    return res.json({
+      success: true,
+      message: "IPアドレスが取得できなかったため、国家データはありません。",
       focuses: [],
+      activeFocus: null,
     });
+  }
 
   try {
     const userNation = await Nation.findOne({ owner: userIp });
 
+    // ★ 国が見つからなくてもエラーにしない
+    if (!userNation) {
+      return res.json({
+        success: true,
+        message: "あなたの国が見つかりませんでした。",
+        focuses: [],
+        activeFocus: null,
+      });
+    }
+
+    // 実行中の国家方針がある場合
     if (userNation.activeFocusId) {
       const activeFocus = NATIONAL_FOCUSES[userNation.activeFocusId];
       return res.json({
@@ -2981,9 +2994,11 @@ app.get("/api/getAvailableNationalFocuses", async (req, res) => {
       });
     }
 
+    // 利用可能な国家方針を計算
     const availableFocuses = [];
     for (const id in NATIONAL_FOCUSES) {
       const focus = NATIONAL_FOCUSES[id];
+
       if (userNation.completedFocuses.includes(id)) continue;
 
       const hasPrerequisites = focus.prerequisites.every((prereqId) =>
@@ -2996,15 +3011,23 @@ app.get("/api/getAvailableNationalFocuses", async (req, res) => {
       );
       if (isExclusive) continue;
 
-      availableFocuses.push({ id: id, ...focus });
+      availableFocuses.push({ id, ...focus });
     }
-    res.json({ success: true, focuses: availableFocuses, activeFocus: null });
+
+    res.json({
+      success: true,
+      focuses: availableFocuses,
+      activeFocus: null,
+    });
   } catch (error) {
     console.error("getAvailableNationalFocuses エラー:", error);
+
+    // ここも500にせず安全に成功返しにしてもOK（必要なら）
     res.status(500).json({
       success: false,
       message: "利用可能な国家方針の取得中にエラーが発生しました。",
       focuses: [],
+      activeFocus: null,
     });
   }
 });
