@@ -1,0 +1,19 @@
+{
+  "name": "global-nation-game",
+  "version": "1.0.0",
+  "description": "A node.js based nation management game.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "date-fns": "^3.6.0",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "mongoose": "^8.4.1",
+    "node-cron": "^3.0.3"
+  }
+}

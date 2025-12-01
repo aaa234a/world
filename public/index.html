@@ -1,0 +1,1995 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8" />
+    <title>国運営ゲームJAPAN</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <!-- Google Fonts: Noto Sans JP -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap" rel="stylesheet">
+    <!-- Font Awesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+
+    <style>
+        /* Global Styles */
+        body { font-family: 'Noto Sans JP', sans-serif; /* Changed font */ background: #f0f4f8; /* Lighter background */ color: #334e68; /* Darker text for better readability */ margin: 20px auto; max-width: 1024px; /* Slightly wider content area */ padding: 0 20px 40px 20px; line-height: 1.6; }
+        h1 { text-align: center; color: #2c5282; /* Deeper blue for headings */ margin-bottom: 25px; font-size: 2.5em; font-weight: 700; }
+        h2, h3 { color: #2c5282; margin-top: 40px; /* Increased margin-top for sections */ margin-bottom: 15px; font-weight: 700; border-bottom: 2px solid #d9e2ec; /* Subtle underline */ padding-bottom: 5px; }
+        h2 i, h3 i { margin-right: 10px; color: #4a90e2; /* Accent color for icons */ }
+
+        /* Form Elements */
+        input[type="text"], input[type="number"], input[type="color"], select { padding: 8px 12px; /* Increased padding */ border: 1px solid #cbd5e1; border-radius: 6px; /* More rounded corners */ font-size: 15px; width: auto; min-width: 120px; margin-right: 10px; box-sizing: border-box; transition: border-color 0.2s, box-shadow 0.2s; }
+        input[type="text"]:focus, input[type="number"]:focus, select:focus { border-color: #4a90e2; /* Accent color on focus */ box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.2); outline: none; }
+        input[type="color"] { padding: 4px; /* Adjust padding for color input */ height: 38px; /* Match height of other inputs */ vertical-align: middle; }
+
+        button { background-color: #4a90e2; /* Primary blue button */ color: white; border: none; padding: 9px 18px; /* Increased padding */ border-radius: 6px; font-weight: 600; cursor: pointer; transition: background-color 0.25s ease, transform 0.1s; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        button:hover { background-color: #357ABD; /* Darker blue on hover */ transform: translateY(-1px); /* Slight lift on hover */ box-shadow: 0 4px 8px rgba(0,0,0,0.15); }
+        button:active { transform: translateY(0); box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        button:disabled { /* NEW: Style for disabled buttons */ background-color: #a0aec0; cursor: not-allowed; box-shadow: none; transform: none; }
+
+        /* Map Section */
+        #map { height: 600px; width: 100%; margin-top: 30px; border: 2px solid #d9e2ec; border-radius: 8px; /* More rounded map corners */ box-shadow: 0 5px 15px rgba(0,0,0,0.1); /* Stronger shadow */ }
+
+        /* Card-like Sections */
+        .card { background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin-top: 20px; box-shadow: 0 3px 10px rgba(0,0,0,0.08); }
+        #spyResult { background: #e0e7ff; /* Light blue for spy results */ border-color: #c3dafe; padding: 15px 20px; margin-top: 15px; max-width: 400px; /* Adjusted max-width */ }
+        #newsList, #territoryRankingList, #chatLog, #activeWarsList, #ceasefireProposalsList, #whitePeaceProposalsList, #pendingFlightRequests, #establishedFlights { /* Unified styling for lists */ list-style: none; padding: 10px; max-height: 200px; /* Consistent height */ overflow-y: auto; background: white; border: 1px solid #e2e8f0; border-radius: 8px; box-shadow: inset 0 0 5px rgba(0,0,0,0.05); /* Subtle inner shadow */ }
+        #newsList li, #territoryRankingList li, #activeWarsList li, #ceasefireProposalsList li, #whitePeaceProposalsList li, #pendingFlightRequests li, #establishedFlights li { padding: 8px 5px; border-bottom: 1px dashed #e2e8f0; /* Dashed separator */ font-size: 14px; }
+        #newsList li:last-child, #territoryRankingList li:last-child, #activeWarsList li:last-child, #ceasefireProposalsList li:last-child, #whitePeaceProposalsList li:last-child, #pendingFlightRequests li:last-child, #establishedFlights li:last-child { border-bottom: none; }
+        #chatLog { height: 200px; padding: 15px; margin-bottom: 15px; }
+        #chatLog p { margin: 5px 0; font-size: 14px; }
+        .chat-time { color: #627d98; font-size: 0.85em; margin-right: 5px; }
+        .chat-name { font-weight: bold; color: #2c5282; }
+
+        #modeStatus, #invasionStatus { /* Combined styling for status messages */ padding: 10px 15px; font-weight: 700; color: #fff; background-color: #e03131; /* More vibrant red */ border-radius: 8px; margin-top: 20px; text-align: center; box-shadow: 0 2px 5px rgba(224, 49, 49, 0.3); }
+        #invasionStatus { /* Specific styling for invasion status */ background-color: #dc3545; /* Red */ }
+
+        /* Section Specific Styles */
+        section { margin-bottom: 40px; }
+        div { margin-bottom: 15px; /* Consistent spacing for form groups */ }
+        div > label, div > input, div > select, div > button { vertical-align: middle; }
+
+        #onlineUsers { background: #e6f0ff; border-color: #cce0ff; padding: 15px 20px; margin-top: 20px; }
+        #onlineUsers h3 { color: #2b6cb0; margin-top: 0; margin-bottom: 10px; border-bottom: none; padding-bottom: 0; }
+        #onlineUsersList { list-style: none; padding: 0; margin: 0; font-size: 14px; line-height: 1.8; display: flex; /* Flexbox for inline display */ flex-wrap: wrap; gap: 8px; /* Gap between items */ }
+        #onlineUsersList li { background-color: #cce0ff; border-radius: 4px; padding: 5px 10px; color: #2c5282; font-weight: 500; border-bottom: none; /* Remove list item border */ }
+
+        /* National Focus specific styles */
+        .focus-list { list-style: none; padding: 0; }
+        .focus-item { background-color: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px 20px; margin-bottom: 12px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        .focus-item h4 { margin-top: 0; margin-bottom: 8px; color: #2c5282; border-bottom: 1px dotted #e2e8f0; padding-bottom: 5px; font-size: 1.2em; }
+        .focus-item p { font-size: 14px; color: #4a5568; margin-bottom: 8px; }
+        .focus-item .cost { font-size: 13px; color: #718096; margin-bottom: 10px; }
+        .focus-item button { float: right; margin-top: -10px; /* Adjust button position */ padding: 7px 14px; font-size: 0.9em; }
+        #currentFocusStatus { background-color: #d1e7dd; /* Light green for active */ border: 1px solid #b3d1c1; padding: 15px 20px; border-radius: 8px; margin-bottom: 20px; color: #0f5132; box-shadow: 0 2px 5px rgba(15, 81, 50, 0.1); }
+        #currentFocusStatus.no-focus { background-color: #f8d7da; /* Light red for no active focus */ border-color: #f5c2c7; color: #842029; box-shadow: 0 2px 5px rgba(132, 32, 41, 0.1); }
+        #currentFocusStatus p { margin: 5px 0; }
+        #currentFocusStatus strong { color: #0f5132; }
+        #currentFocusStatus.no-focus strong { color: #842029; }
+
+        /* Tutorial Box */
+        #tutorialBox { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); /* Centered */ width: 90%; max-width: 550px; background: white; border: 2px solid #4a90e2; /* Accent border */ border-radius: 10px; box-shadow: 0 5px 20px rgba(0,0,0,0.2); z-index: 9999; padding: 25px; text-align: center; }
+        #tutorialBox #tutorialText { font-size: 1.1em; margin-bottom: 20px; color: #334e68; }
+        #tutorialBox button { margin-top: 10px; float: none; /* Center button */ display: inline-block; }
+
+        /* New CSS for glowing titles */
+        .glowing-text { font-weight: bold; /* text-shadow will be applied dynamically via JS for the color */ /* Example: text-shadow: 0 0 5px #FFD700, 0 0 10px #FFD700, 0 0 15px #FFD700; */ }
+
+        /* War Management Specific Styles */
+        .war-status-ongoing { color: #dc3545; font-weight: bold; }
+        .war-status-declared { color: #ffc107; font-weight: bold; }
+        .war-status-ceasefire { color: #17a2b8; font-weight: bold; }
+        .war-status-ended { color: #6c757d; }
+        .war-status-cancelled { color: #6c757d; }
+        .war-status-whitepeaceproposed { color: #800080; font-weight: bold; } /* NEW: Purple for white peace */
+
+        /* Peace Conference Modal */
+        .modal { display: none; /* Hidden by default */ position: fixed; /* Stay in place */ z-index: 10000; /* Sit on top */ left: 0; top: 0; width: 100%; /* Full width */ height: 100%; /* Full height */ overflow: auto; /* Enable scroll if needed */ background-color: rgba(0,0,0,0.4); /* Black w/ opacity */ }
+
+        .modal-content { background-color: #fefefe; margin: 5% auto; /* 5% from the top and centered */ padding: 30px; border: 1px solid #888; width: 90%; /* Could be more responsive */ max-width: 800px; border-radius: 10px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); position: relative; }
+
+        .close-button { color: #aaa; float: right; font-size: 28px; font-weight: bold; position: absolute; top: 10px; right: 20px; }
+
+        .close-button:hover, .close-button:focus { color: black; text-decoration: none; cursor: pointer; }
+
+        .peace-demand-section { margin-bottom: 20px; padding: 15px; border: 1px solid #e2e8f0; border-radius: 8px; background-color: #f8faff; }
+        .peace-demand-section h4 { margin-top: 0; color: #2c5282; }
+        .peace-demand-item { display: flex; align-items: center; margin-bottom: 10px; }
+        .peace-demand-item label { flex: 1; margin-right: 10px; }
+        .peace-demand-item input[type="number"] { flex: 2; max-width: 150px; }
+        .peace-demand-item select { flex: 2; max-width: 150px; }
+        .peace-demand-item span { flex: 1; text-align: right; font-weight: bold; }
+        .peace-demand-item button { margin-left: 10px; padding: 5px 10px; font-size: 0.9em; }
+        #peaceDemandsTerritories { width: 100%; height: 100px; border: 1px solid #cbd5e1; border-radius: 6px; padding: 8px; box-sizing: border-box; }
+
+        /* NEW: Flag Image Styles */
+        .flag-icon { width: 20px; height: 14px; margin-right: 5px; vertical-align: middle; border: 1px solid #ccc; flex-shrink: 0; /* Prevent shrinking in flex containers */ }
+
+        /* Responsive Adjustments */
+        @media (max-width: 768px) {
+            body { padding: 10px 15px 30px 15px; margin: 0 auto; }
+            h1 { font-size: 2em; }
+            h2, h3 { font-size: 1.5em; margin-top: 30px; }
+            input[type="text"], input[type="number"], select, button { width: 100%; margin-bottom: 10px; margin-right: 0; }
+            input[type="color"] { width: calc(100% - 10px); /* Adjust for padding */ }
+            .card { padding: 15px; }
+            #spyResult, #onlineUsers, #newsList, #chatLog { max-width: 100%; }
+            .focus-item button { float: none; display: block; margin: 10px auto 0 auto; }
+            .modal-content { margin: 10% auto; width: 95%; padding: 20px; }
+            .peace-demand-item { flex-direction: column; align-items: flex-start; }
+            .peace-demand-item label, .peace-demand-item input, .peace-demand-item select, .peace-demand-item span { width: 100%; margin-right: 0; margin-bottom: 5px; }
+            .peace-demand-item button { margin-left: 0; margin-top: 10px; width: 100%; }
+            #flagUrlInput { width: calc(100% - 120px) !important; /* Adjust for smaller screens */ }
+        }
+
+        @media (max-width: 480px) {
+            h1 { font-size: 1.8em; }
+            h2, h3 { font-size: 1.3em; }
+            #map { height: 400px; }
+            #tutorialBox { padding: 15px; }
+            #tutorialBox #tutorialText { font-size: 1em; }
+        }
+    </style>
+</head>
+<body>
+    <h1><i class="fas fa-globe-asia"></i> 国運営ゲーム</h1>
+    <section>
+        <h2><i class="fas fa-book-open"></i> 国運営ゲームの遊び方</h2>
+        <p>このゲームでは、あなたが一国のリーダーとなり、領土の拡大・軍隊の増強・お金の管理などを行います。以下のポイントにそってプレイしてみましょう！</p>
+        <ul>
+            <li><strong>国の登録:</strong> 地図上の灰色の「未所属地域」をクリックして、まずは自分の国を登録しましょう（最初の1つ目は無料で登録できます）</li>
+            <li><strong>自分の国の情報を見る:</strong> 地図上で自分の領土（自分の色）をクリックすると、国名・お金・軍隊の数などを確認できます。他の国をクリックすると、その国の名前もわかります。</li>
+            <li><strong>人口とお金:</strong> 領土を購入すると人口が増え（+1000）、人口に応じてお金が自動で増えていきます（人口 × 0.005円）。ただし、領土を奪われると人口が減ってしまいます。</li>
+            <li><strong>資源 (NEW):</strong> 各領土は「石油」と「鉄」を生産します。所有する領土から定期的に資源が供給されます。</li>
+            <li><strong>軍隊の増強:</strong> お金に加えて、石油と鉄を消費して歩兵、戦車、機械化歩兵、砲兵、爆撃機、ミサイル、核ミサイルを購入し、軍事力を高めましょう。</li>
+            <li><strong>爆撃機:</strong> 爆撃機（90円、石油・鉄消費あり）を購入し、敵領土を爆撃して防衛軍に損害を与えることができます。</li>
+            <li><strong>ミサイル:</strong> ミサイル（10000円、50石油、100鉄消費あり）を購入し、敵領土に発射することで人口にダメージを与え、防衛軍を半壊させることができます。</li>
+            <li><strong>核ミサイル:</strong> 核ミサイル（50000円、500石油、1000鉄消費あり）を購入し、敵領土に発射することで人口と防衛軍に壊滅的なダメージを与えます。</li>
+            <li><strong>スパイ活動:</strong> 他国の国名を入力してスパイを送ると、その国の兵力やお金、そして石油や鉄の所持量を調査できます（※失敗の可能性もあります）。</li>
+            <li><strong>貿易（援助）:</strong> 他国にお金や兵力、そして石油や鉄を渡すことができます。友好国との協力や支援に活用しましょう。</li>
+            <li>**防衛:** 防衛力は、保有している総軍備（歩兵、戦車、機械化歩兵、砲兵）を領土数で割った値に基づいて計算されます。軍備を増強し、領土を拡大することで、国の防衛力が向上します。</li>
+            <li><strong>攻撃モード:</strong> 敵国の領土をクリックして攻撃を仕掛けます。勝つとその領土を自分のものにできます！</li>
+            <li><strong>爆撃モード:</strong> 爆撃機を消費して、敵国の領土を爆撃し、防衛部隊に損害を与えます。</li>
+            <li><strong>ミサイルモード:</strong> ミサイルを消費して、敵国の領土に発射し、人口と防衛部隊に大きな損害を与えます。</li>
+            <li><strong>核ミサイルモード:</strong> 核ミサイルを消費して、敵国の領土に発射し、人口と防衛部隊に壊滅的な損害を与えます。</li>
+            <li><strong>最新ニュース:</strong> 戦闘やスパイ活動など、ゲーム内で起きた出来事が速報として表示されます。こまめにチェックしましょう。</li>
+        </ul>
+        <!-- チュートリアル開始ボタン -->
+        <button id="startTutorialBtn" onclick="startTutorial()" style=" display: block; margin: 20px auto; padding: 15px 30px; font-size: 20px; font-weight: bold; background-color: #10b981; color: white; border: none; border-radius: 10px; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4); cursor: pointer; transition: background-color 0.3s, transform 0.1s; ">🧭 はじめての方へ：チュートリアルを始める</button>
+
+        <!-- チュートリアル表示エリア -->
+        <div id="tutorialBox" style="display:none; position:fixed; top:10%; left:50%; transform:translateX(-50%); width:80%; max-width:500px; background:white; border:2px solid #2563eb; border-radius:10px; box-shadow:0 0 10px rgba(0,0,0,0.3); z-index:9999; padding:20px;">
+            <div id="tutorialText" style="font-size:16px; margin-bottom:15px;"></div>
+            <button onclick="nextTutorialStep()" style="float:right;">▶ 次へ</button>
+        </div>
+
+    </section>
+    <div class="card">
+        <h3><i class="fas fa-book-open"></i> 国の登録</h3>
+        登録する国名: <input id="nationNameInput" type="text" placeholder="あなたの国の名前" />
+        <button onclick="startRegisterNation()"><i class="fas fa-plus-circle"></i> 国を登録</button>
+    </div>
+
+    <div class="card">
+        <h3><i class="fas fa-hammer"></i> 軍隊増強</h3>
+        種類: <select id="unitType">
+        <option value="infantry">歩兵 (<span id="infantryCost"></span>円, <span id="infantryOilCost"></span>石油, <span id="infantryIronCost"></span>鉄)</option>
+        <option value="tank">戦車 (<span id="tankCost"></span>円, <span id="tankOilCost"></span>石油, <span id="tankIronCost"></span>鉄)</option>
+        <option value="mechanizedInfantry">機械化歩兵 (<span id="mechanizedInfantryCost"></span>円, <span id="mechanizedInfantryOilCost"></span>石油, <span id="mechanizedInfantryIronCost"></span>鉄)</option>
+        <option value="artillery">砲兵 (<span id="artilleryCost"></span>円, <span id="artilleryOilCost"></span>石油, <span id="artilleryIronCost"></span>鉄)</option>
+        <option value="bomber">爆撃機 (<span id="bomberCost"></span>円, <span id="bomberOilCost"></span>石油, <span id="bomberIronCost"></span>鉄)</option>
+        <option value="missile">ミサイル (<span id="missileCost"></span>円, <span id="missileOilCost"></span>石油, <span id="missileIronCost"></span>鉄)</option>
+        <option value="nuclearMissile">核ミサイル (<span id="nuclearMissileCost"></span>円, <span id="nuclearMissileOilCost"></span>石油, <span id="nuclearMissileIronCost"></span>鉄)</option>
+    </select>
+        数量: <input type="number" id="unitAmount" value="1" min="1" />
+        <button onclick="reinforce()"><i class="fas fa-cart-plus"></i> 増強</button>
+    </div>
+
+    <!-- NEW: Infrastructure Building Section -->
+    <div class="card">
+        <h3><i class="fas fa-building"></i> インフラ・観光施設建設</h3>
+        種類: <select id="infrastructureType">
+        <option value="railway">鉄道 (<span id="railwayCost"></span>円, <span id="railwayIronCost"></span>鉄, <span id="railwayOilCost"></span>石油)</option>
+        <option value="shinkansen">新幹線 (<span id="shinkansenCost"></span>円, <span id="shinkansenIronCost"></span>鉄, <span id="shinkansenOilCost"></span>石油)</option>
+        <option value="airport">空港 (<span id="airportCost"></span>円, <span id="airportIronCost"></span>鉄, <span id="airportOilCost"></span>石油)</option>
+        <option value="tourismFacility">観光施設 (<span id="tourismFacilityCost"></span>円, <span id="tourismFacilityIronCost"></span>鉄, <span id="tourismFacilityOilCost"></span>石油)</option>
+    </select>
+        数量: <input type="number" id="infrastructureAmount" value="1" min="1" />
+        <button onclick="buildInfrastructure()"><i class="fas fa-plus-square"></i> 建設</button>
+    </div>
+
+    <!-- NEW: Flight Management Section -->
+    <div class="card">
+        <h3><i class="fas fa-plane"></i> 飛行機便管理</h3>
+        <div>
+            飛行機便申請先国名: <input type="text" id="flightTargetNationName" placeholder="申請先の国名" />
+            <button onclick="requestFlight()"><i class="fas fa-paper-plane"></i> 飛行機便申請</button>
+        </div>
+        <div>
+            <h4><i class="fas fa-inbox"></i> あなたへの飛行機便申請</h4>
+            <ul id="pendingFlightRequests" class="card"></ul>
+        </div>
+        <div>
+            <h4><i class="fas fa-route"></i> 現在の飛行機便</h4>
+            <ul id="establishedFlights" class="card"></ul>
+        </div>
+    </div>
+
+    <div class="card">
+        <h3><i class="fas fa-user-secret"></i> スパイ活動</h3>
+        ターゲット国名: <input type="text" id="spyTargetNation" placeholder="スパイ対象の国名" />
+        <button onclick="spy()"><i class="fas fa-eye"></i> スパイする</button>
+        <div id="spyResult" class="card" style="margin-top:10px; font-weight:bold;"></div>
+    </div>
+
+    <!-- NEW: Sabotage Section -->
+    <div class="card">
+        <h3><i class="fas fa-user-ninja"></i> 破壊工作 (Sabotage)</h3>
+        <p>ターゲット国の兵力、資金、資源、人口に損害を与える攻撃版スパイ活動です。</p>
+        <p>コスト: <span id="sabotageCost"></span>円 (失敗時: 追加で<span id="sabotageFailureCost"></span>円)</p>
+        ターゲット国名: <input type="text" id="sabotageTargetNation" placeholder="破壊工作対象の国名" />
+        <button onclick="sabotage()"><i class="fas fa-bomb"></i> 破壊工作を実行</button>
+    </div>
+
+    <div class="card">
+        <h3><i class="fas fa-exchange-alt"></i> 貿易</h3>
+        相手国名: <input type="text" id="targetNationName" placeholder="相手の国名" />
+        資源: <select id="resourceType">
+        <option value="money">お金</option>
+        <option value="infantry">歩兵</option>
+        <option value="tank">戦車</option>
+        <option value="mechanizedInfantry">機械化歩兵</option>
+        <option value="artillery">砲兵</option>
+        <option value="bomber">爆撃機</option>
+        <option value="missile">ミサイル</option>
+        <option value="nuclearMissile">核ミサイル</option>
+        <option value="oil">石油</option>
+        <option value="iron">鉄</option>
+    </select>
+        数量: <input type="number" id="resourceAmount" min="1" value="10" />
+        <button onclick="sendResourcesByName()"><i class="fas fa-paper-plane"></i> 送る</button>
+    </div>
+
+    <div class="card">
+        <h3><i class="fas fa-handshake"></i> 領土譲渡モード</h3>
+        譲渡先国名: <input type="text" id="transferNationName" placeholder="譲渡先の国名" />
+        <button onclick="startTransferMode()"><i class="fas fa-share-square"></i> 譲渡モード開始</button>
+        <button onclick="endTransferMode()"><i class="fas fa-times-circle"></i> 譲渡モード終了</button>
+        <p>譲渡したい領土を地図でクリックしてください。</p>
+    </div>
+
+    <div class="card">
+        <h3><i class="fas fa-users-cog"></i> 同盟管理</h3>
+        <div>
+            同盟申請先国名: <input type="text" id="allianceTargetNationName" placeholder="申請先の国名" />
+            <button onclick="requestAlliance()"><i class="fas fa-user-plus"></i> 同盟申請</button>
+        </div>
+        <div>
+            <h4><i class="fas fa-inbox"></i> あなたへの同盟申請</h4>
+            <ul id="pendingAllianceRequests" class="card"></ul>
+        </div>
+        <div>
+            <h4><i class="fas fa-handshake-alt"></i> 現在の同盟国</h4>
+            <ul id="currentAlliances" class="card"></ul>
+        </div>
+    </div>
+
+    <div class="card">
+        <h3><i class="fas fa-edit"></i> 国の情報変更</h3>
+        <div>
+            新しい国名: <input id="newNationNameInput" type="text" placeholder="新しい国名" />
+            新しい色: <input id="newNationColorInput" type="color" value="#4a90e2" />
+            <button onclick="changeNationInfo()"><i class="fas fa-save"></i> 変更する</button>
+        </div>
+    </div>
+
+    <!-- NEW: Flag Editor Section -->
+    <div class="card">
+        <h3><i class="fas fa-flag"></i> 国旗エディター</h3>
+        <div>
+            <label for="flagUrlInput">国旗URL:</label>
+            <input type="text" id="flagUrlInput" placeholder="画像URL (例: https://example.com/flag.png)" style="width: calc(100% - 120px);" />
+            <button onclick="updateFlagFromUrl()">URLで更新</button>
+        </div>
+        <div style="margin-top: 10px;">
+            <input type="file" id="flagFileInput" accept="image/*" style="display: none;">
+            <button onclick="document.getElementById('flagFileInput').click()"><i class="fas fa-upload"></i> ファイルから選択</button>
+            <canvas id="flagCanvas" style="display:none;"></canvas>
+        </div>
+        <div id="currentFlagDisplay" style="margin-top: 10px; text-align: center;">
+            <p>現在の国旗:</p>
+            <img id="currentFlagImage" src="" alt="現在の国旗" class="flag-icon" style="max-width: 300px; max-height: 210px; border: 1px solid #ccc; display: none;" />
+            <p id="noFlagMessage" style="display: block;">国旗が設定されていません。</p>
+        </div>
+    </div>
+
+    <!-- NEW: Title Management Section -->
+    <div class="card">
+        <h2><i class="fas fa-crown"></i> 称号管理</h2>
+        <div>
+            <p>現在の表示称号: <span id="currentDisplayTitle">なし</span></p>
+            <p>所有称号から選択:</p>
+            <select id="acquiredTitlesSelect">
+                <!-- Options will be populated by JS -->
+            </select>
+            <button onclick="selectDisplayTitle()"><i class="fas fa-check-circle"></i> この称号を表示</button>
+            <button onclick="grantTestTitle()"><i class="fas fa-gift"></i> テスト称号付与</button>
+        </div>
+    </div>
+
+    <div class="card">
+        <h3><i class="fas fa-bomb"></i> 爆撃モード</h3>
+        爆撃機数: <input type="number" id="bomberCount" value="1" min="1" max="100">
+        <button id="startBombardModeBtn" onclick="startBombardMode()"><i class="fas fa-plane-departure"></i> 爆撃モード開始</button>
+        <button onclick="endBombardMode()"><i class="fas fa-times-circle"></i> 爆撃モード終了</button>
+        <p>爆撃したい領土を地図でクリックしてください</p>
+    </div>
+    <div class="card">
+        <h3><i class="fas fa-rocket"></i> ミサイルモード</h3>
+        ミサイル発射数: <input type="number" id="missileCount" value="1" min="1" max="100">
+        <button id="startMissileModeBtn" onclick="startMissileMode()"><i class="fas fa-crosshairs"></i> ミサイルモード開始</button>
+        <button onclick="endMissileMode()"><i class="fas fa-times-circle"></i> ミサイルモード終了</button>
+        <p>ミサイルを発射したい敵領土を地図でクリックしてください</p>
+    </div>
+
+    <!-- NEW: Nuclear Missile Mode -->
+    <div class="card">
+        <h3><i class="fas fa-radiation"></i> 核ミサイルモード</h3>
+        核ミサイル発射数: <input type="number" id="nuclearMissileCount" value="1" min="1" max="5">
+        <button id="startNuclearMissileModeBtn" onclick="startNuclearMissileMode()"><i class="fas fa-biohazard"></i> 核ミサイルモード開始</button>
+        <button onclick="endNuclearMissileMode()"><i class="fas fa-times-circle"></i> 核ミサイルモード終了</button>
+        <p>核ミサイルを発射したい敵領土を地図でクリックしてください</p>
+    </div>
+
+    <div class="card">
+        <h3><i class="fas fa-fist-raised"></i> 攻撃実行</h3>
+        攻撃歩兵数: <input type="number" id="attackInfantry" value="10" max="200" min="20">
+        攻撃戦車数: <input type="number" id="attackTank" value="5" max="70" min="0">
+        攻撃機械化歩兵数: <input type="number" id="attackMechInf" value="5" max="130" min="0">
+        攻撃砲兵数: <input type="number" id="attackArtillery" value="0" max="100" min="0">
+        <button id="startAttackModeBtn" onclick="startAttackMode()"><i class="fas fa-gavel"></i> 攻撃モード開始</button>
+        <p>相手領土を地図でクリックして攻撃開始</p>
+    </div>
+
+    <!-- NEW: Rebellion Section -->
+    <div class="card">
+        <h3><i class="fas fa-republican"></i> 反乱 (Rebellion)</h3>
+        <p>領土を所有していない場合、他国の領土で反乱を起こし、新たな国を建国できます。</p>
+        <p><strong>注意:</strong> 反乱は1ユーザーにつき最大<span id="maxRebellionsCount"></span>回まで可能です。</p>
+        反乱を起こす領土名: <input type="text" id="rebellionTargetCountryName" placeholder="反乱を起こす領土名" />
+        <button onclick="attemptRebellion()"><i class="fas fa-hand-sparkles"></i> 反乱を起こす</button>
+    </div>
+
+    <!-- NEW: War Management Section -->
+    <div class="card">
+        <h2><i class="fas fa-bell"></i> 戦争管理</h2>
+        <div>
+            <h3><i class="fas fa-flag-checkered"></i> 宣戦布告</h3>
+            宣戦布告対象国名: <input type="text" id="warTargetNationName" placeholder="宣戦布告する国名" />
+            <button onclick="declareWar()"><i class="fas fa-exclamation-triangle"></i> 宣戦布告</button>
+        </div>
+        <div>
+            <h3><i class="fas fa-scroll"></i> 現在の戦争</h3>
+            <ul id="activeWarsList" class="card"></ul>
+        </div>
+        <div>
+            <h3><i class="fas fa-handshake-alt-slash"></i> 停戦提案</h3>
+            <ul id="ceasefireProposalsList" class="card"></ul>
+        </div>
+        <!-- NEW: White Peace Proposals Section -->
+        <div>
+            <h3><i class="fas fa-peace"></i> 白紙講和提案</h3>
+            <ul id="whitePeaceProposalsList" class="card"></ul>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2><i class="fas fa-comments"></i> 全体チャット</h2>
+        <div id="chatLog"></div>
+        <div>
+            <input type="text" id="chatInput" placeholder="メッセージを入力..." style="width: calc(100% - 90px);" onkeydown="if(event.key === 'Enter') sendChatMessage();">
+            <button onclick="sendChatMessage()" style="width: 80px;"><i class="fas fa-paper-plane"></i> 送信</button>
+        </div>
+        
+    </div>
+
+    <div class="card">
+        <h3><i class="fas fa-users"></i> オンライン中のプレイヤー</h3>
+        <p style="font-size: 12px; color: #666;">※30秒以内に活動があったプレイヤーが表示されます。</p>
+        <ul id="onlineUsersList">
+            <li>読み込み中...</li>
+        </ul>
+    </div>
+    <img src="https://www.cloudsemi.com/test/so/douga/so1png/sc1ja_001-09.png" height="400" alt="資源分布" style="display: block; max-width: 100%; height: auto; margin: 20px auto; border-radius: 8px; box-shadow: 0 3px 10px rgba(0,0,0,0.08);">
+
+    <div class="card">
+        <h2><i class="fas fa-newspaper"></i> 最新ニュース</h2>
+        <ul id="newsList"></ul>
+    </div>
+
+    <div class="card">
+        <h2><i class="fas fa-trophy"></i> 領土数ランキング</h2>
+        <ul id="territoryRankingList">
+            <li>読み込み中...</li>
+        </ul>
+    </div>
+
+    <div id="modeStatus" style="padding: 5px; font-weight: bold; color: white; background-color: darkred; display: none;">
+        モード実行中！対象の領土をクリックしてください。
+    </div>
+
+    <!-- NEW: Invasion Status Display -->
+    <div id="invasionStatus" style="padding: 5px; font-weight: bold; color: white; background-color: darkred; display: none;">
+        現在、攻撃が進行中です。完了するまでお待ちください。
+    </div>
+
+    <div id="map"></div>
+
+    <!-- NEW: National Focus Section -->
+    <div class="card">
+        <h2><i class="fas fa-bullseye"></i> 国家方針</h2>
+        <div id="currentFocusStatus" class="no-focus">
+            <p><strong>現在の国家方針:</strong> <span id="focusName">なし</span></p>
+            <p><span id="focusDescription">国家方針を選択して、国を強化しましょう。</span></p>
+            <p id="focusProgress">残りターン: <span id="focusTurnsRemaining"></span></p>
+            <button id="resetFocusBtn" onclick="resetFocus()" style="display: none;"><i class="fas fa-redo-alt"></i> 国家方針をリセット (テスト用)</button>
+        </div>
+
+        <h3><i class="fas fa-list-alt"></i> 利用可能な国家方針</h3>
+        <ul id="availableFocuses" class="focus-list">
+            <li>国家方針を読み込み中...</li>
+        </ul>
+    </div>
+
+    <!-- Peace Conference Modal -->
+    <div id="peaceConferenceModal" class="modal">
+        <div class="modal-content">
+            <span class="close-button" onclick="closePeaceConferenceModal()">&times;</span>
+            <h2><i class="fas fa-gavel"></i> 講和会議</h2>
+            <p><strong>戦争ID:</strong> <span id="pcWarId"></span></p>
+            <p><strong>勝者:</strong> <span id="pcWinnerNation"></span></p>
+            <p><strong>敗者:</strong> <span id="pcLoserNation"></span></p>
+            <p><strong>利用可能な戦勝点:</strong> <span id="pcAvailableWarPoints"></span></p>
+            <p><strong>要求コスト:</b> <span id="pcDemandsCost">0</span></p>
+
+            <div class="peace-demand-section">
+                <h4><i class="fas fa-coins"></i> 賠償金 (お金・資源)</h4>
+                <div class="peace-demand-item">
+                    <label for="pcMoney">お金 (<span id="pcLoserMoney"></span>円まで)</label>
+                    <input type="number" id="pcMoney" min="0" value="0" oninput="calculatePeaceDemandsCost()">
+                    <span>コスト: <span id="pcMoneyCost">0</span></span>
+                </div>
+                <div class="peace-demand-item">
+                    <label for="pcOil">石油 (<span id="pcLoserOil"></span>個まで)</label>
+                    <input type="number" id="pcOil" min="0" value="0" oninput="calculatePeaceDemandsCost()">
+                    <span>コスト: <span id="pcOilCost">0</span></span>
+                </div>
+                <div class="peace-demand-item">
+                    <label for="pcIron">鉄 (<span id="pcLoserIron"></span>個まで)</label>
+                    <input type="number" id="pcIron" min="0" value="0" oninput="calculatePeaceDemandsCost()">
+                    <span>コスト: <span id="pcIronCost">0</span></span>
+                </div>
+            </div>
+
+            <div class="peace-demand-section">
+                <h4><i class="fas fa-users"></i> 軍備</h4>
+                <div class="peace-demand-item">
+                    <label for="pcInfantry">歩兵 (<span id="pcLoserInfantry"></span>体まで)</label>
+                    <input type="number" id="pcInfantry" min="0" value="0" oninput="calculatePeaceDemandsCost()">
+                    <span>コスト: <span id="pcInfantryCost">0</span></span>
+                </div>
+                <div class="peace-demand-item">
+                    <label for="pcTank">戦車 (<span id="pcLoserTank"></span>台まで)</label>
+                    <input type="number" id="pcTank" min="0" value="0" oninput="calculatePeaceDemandsCost()">
+                    <span>コスト: <span id="pcTankCost">0</span></span>
+                </div>
+                <div class="peace-demand-item">
+                    <label for="pcMechanizedInfantry">機械化歩兵 (<span id="pcLoserMechanizedInfantry"></span>体まで)</label>
+                    <input type="number" id="pcMechanizedInfantry" min="0" value="0" oninput="calculatePeaceDemandsCost()">
+                    <span>コスト: <span id="pcMechanizedInfantryCost">0</span></span>
+                </div>
+                <div class="peace-demand-item">
+                    <label for="pcArtillery">砲兵 (<span id="pcLoserArtillery"></span>体まで)</label>
+                    <input type="number" id="pcArtillery" min="0" value="0" oninput="calculatePeaceDemandsCost()">
+                    <span>コスト: <span id="pcArtilleryCost">0</span></span>
+                </div>
+                <div class="peace-demand-item">
+                    <label for="pcBomber">爆撃機 (<span id="pcLoserBomber"></span>機まで)</label>
+                    <input type="number" id="pcBomber" min="0" value="0" oninput="calculatePeaceDemandsCost()">
+                    <span>コスト: <span id="pcBomberCost">0</span></span>
+                </div>
+                <div class="peace-demand-item">
+                    <label for="pcMissile">ミサイル (<span id="pcLoserMissile"></span>機まで)</label>
+                    <input type="number" id="pcMissile" min="0" value="0" oninput="calculatePeaceDemandsCost()">
+                    <span>コスト: <span id="pcMissileCost">0</span></span>
+                </div>
+                <div class="peace-demand-item">
+                    <label for="pcNuclearMissile">核ミサイル (<span id="pcLoserNuclearMissile"></span>機まで)</label>
+                    <input type="number" id="pcNuclearMissile" min="0" value="0" oninput="calculatePeaceDemandsCost()">
+                    <span>コスト: <span id="pcNuclearMissileCost">0</span></span>
+                </div>
+            </div>
+
+            <div class="peace-demand-section">
+                <h4><i class="fas fa-map"></i> 領土</h4>
+                <p>要求する領土を選択してください (複数選択可)。</p>
+                <select id="peaceDemandsTerritories" multiple size="5" onchange="calculatePeaceDemandsCost()">
+                    <!-- Options will be populated by JS -->
+                </select>
+                <span>コスト: <span id="pcTerritoryCost">0</span></span>
+            </div>
+
+            <button onclick="makePeaceDemands()"><i class="fas fa-check-circle"></i> 要求を確定し講和する</button>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        // ==========================================================
+        // クライアントサイド JavaScript のコード (client.jsの内容をここに直接記述)
+        // ==========================================================
+
+        let nationalFocusDefinitionsClient = {};
+        let missileMode = false;
+        let nuclearMissileMode = false;
+        let isRegisteringNation = false;
+        let attackMode = false;
+        let bombardMode = false;
+        let transferMode = false;
+        let currentUserIp = null; // IPアドレスに変更
+        let gameConstants = {};
+
+        // Peace Conference Costs (will be populated from gameConstants)
+        let PEACE_COST_MONEY_PER_1000_CLIENT;
+        let PEACE_COST_INFANTRY_CLIENT;
+        let PEACE_COST_TANK_CLIENT;
+        let PEACE_COST_MECHANIZED_INFANTRY_CLIENT;
+        let PEACE_COST_BOMBER_CLIENT;
+        let PEACE_COST_MISSILE_CLIENT;
+        let PEACE_COST_NUCLEAR_MISSILE_CLIENT;
+        let PEACE_COST_ARTILLERY_CLIENT;
+        let PEACE_COST_OIL_PER_10_CLIENT;
+        let PEACE_COST_IRON_PER_10_CLIENT;
+        let PEACE_COST_TERRITORY_CLIENT;
+
+        let SABOTAGE_COST_CLIENT;
+        let SABOTAGE_FAILURE_COST_CLIENT;
+
+        let RAILWAY_COST_CLIENT;
+        let RAILWAY_IRON_COST_CLIENT;
+        let RAILWAY_OIL_COST_CLIENT;
+
+        let SHINKANSEN_COST_CLIENT;
+        let SHINKANSEN_IRON_COST_CLIENT;
+        let SHINKANSEN_OIL_COST_CLIENT;
+
+        let AIRPORT_COST_CLIENT;
+        let AIRPORT_IRON_COST_CLIENT;
+        let AIRPORT_OIL_COST_CLIENT;
+
+        let TOURISM_FACILITY_COST_CLIENT;
+        let TOURISM_FACILITY_IRON_COST_CLIENT;
+        let TOURISM_FACILITY_OIL_COST_CLIENT;
+
+        let BASE_TERRITORY_COST_CLIENT;
+        let MAX_REBELLIONS_CLIENT;
+
+        const WAR_STATUS_WHITE_PEACE_PROPOSED = "WhitePeaceProposed";
+
+        var map = L.map('map').setView([35.6895, 139.6917], 5);
+        L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
+            maxZoom: 18,
+            subdomains: ['a', 'b', 'c', 'd'],
+            attribution: '&copy; <a href="https://carto.com/attributions">CARTO</a> ' + '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+        }).addTo(map);
+
+        let nations = [];
+        let geojsonLayer;
+        let titleDefinitions = {};
+        let nationNameToIpMap = {}; // nationName -> IPアドレス
+        let currentPeaceConferenceWar = null;
+
+        // ==========================================================
+        // ヘルパー関数
+        // ==========================================================
+
+        // Fetch APIをラップし、エラーハンドリングを共通化
+        async function fetchData(url, method = 'GET', body = null) {
+            const options = { method, headers: { 'Content-Type': 'application/json' } };
+            if (body) {
+                options.body = JSON.stringify(body);
+            }
+            try {
+                const response = await fetch(url, options);
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    let errorMessage = `API Request Failed: ${response.status} ${response.statusText}`;
+                    try {
+                        const errorData = JSON.parse(errorText);
+                        errorMessage = errorData.message || errorMessage;
+                    } catch {
+                        errorMessage = errorText; // JSONでなければ生テキスト
+                    }
+                    throw new Error(errorMessage);
+                }
+                return response.json();
+            } catch (error) {
+                console.error(`Error requesting ${url}:`, error);
+                throw error; // UIで表示するためにエラーを再スロー
+            }
+        }
+
+        // コスト表示を更新する関数
+        function updateCostDisplays() {
+            if (!gameConstants) return;
+            document.getElementById('infantryCost').textContent = gameConstants.INFANTRY_COST;
+            document.getElementById('infantryOilCost').textContent = gameConstants.INFANTRY_OIL_COST;
+            document.getElementById('infantryIronCost').textContent = gameConstants.INFANTRY_IRON_COST;
+            document.getElementById('tankCost').textContent = gameConstants.TANK_COST;
+            document.getElementById('tankOilCost').textContent = gameConstants.TANK_OIL_COST;
+            document.getElementById('tankIronCost').textContent = gameConstants.TANK_IRON_COST;
+            document.getElementById('mechanizedInfantryCost').textContent = gameConstants.MECHANIZED_INFANTRY_COST;
+            document.getElementById('mechanizedInfantryOilCost').textContent = gameConstants.MECHANIZED_INFANTRY_OIL_COST;
+            document.getElementById('mechanizedInfantryIronCost').textContent = gameConstants.MECHANIZED_INFANTRY_IRON_COST;
+            document.getElementById('artilleryCost').textContent = gameConstants.ARTILLERY_COST;
+            document.getElementById('artilleryOilCost').textContent = gameConstants.ARTILLERY_OIL_COST;
+            document.getElementById('artilleryIronCost').textContent = gameConstants.ARTILLERY_IRON_COST;
+            document.getElementById('bomberCost').textContent = gameConstants.BOMBER_COST;
+            document.getElementById('bomberOilCost').textContent = gameConstants.BOMBER_OIL_COST;
+            document.getElementById('bomberIronCost').textContent = gameConstants.BOMBER_IRON_COST;
+            document.getElementById('missileCost').textContent = gameConstants.MISSILE_COST;
+            document.getElementById('missileOilCost').textContent = gameConstants.MISSILE_OIL_COST;
+            document.getElementById('missileIronCost').textContent = gameConstants.MISSILE_IRON_COST;
+            document.getElementById('nuclearMissileCost').textContent = gameConstants.NUCLEAR_MISSILE_COST;
+            document.getElementById('nuclearMissileOilCost').textContent = gameConstants.NUCLEAR_MISSILE_OIL_COST;
+            document.getElementById('nuclearMissileIronCost').textContent = gameConstants.NUCLEAR_MISSILE_IRON_COST;
+            document.getElementById('sabotageCost').textContent = gameConstants.SABOTAGE_COST;
+            document.getElementById('sabotageFailureCost').textContent = gameConstants.SABOTAGE_FAILURE_COST - gameConstants.SABOTAGE_COST;
+            document.getElementById('railwayCost').textContent = gameConstants.RAILWAY_COST;
+            document.getElementById('railwayIronCost').textContent = gameConstants.RAILWAY_IRON_COST;
+            document.getElementById('railwayOilCost').textContent = gameConstants.RAILWAY_OIL_COST;
+            document.getElementById('shinkansenCost').textContent = gameConstants.SHINKANSEN_COST;
+            document.getElementById('shinkansenIronCost').textContent = gameConstants.SHINKANSEN_IRON_COST;
+            document.getElementById('shinkansenOilCost').textContent = gameConstants.SHINKANSEN_OIL_COST;
+            document.getElementById('airportCost').textContent = gameConstants.AIRPORT_COST;
+            document.getElementById('airportIronCost').textContent = gameConstants.AIRPORT_IRON_COST;
+            document.getElementById('airportOilCost').textContent = gameConstants.AIRPORT_OIL_COST;
+            document.getElementById('tourismFacilityCost').textContent = gameConstants.TOURISM_FACILITY_COST;
+            document.getElementById('tourismFacilityIronCost').textContent = gameConstants.TOURISM_FACILITY_IRON_COST;
+            document.getElementById('tourismFacilityOilCost').textContent = gameConstants.TOURISM_FACILITY_OIL_COST;
+
+            PEACE_COST_MONEY_PER_1000_CLIENT = gameConstants.PEACE_COST_MONEY_PER_1000;
+            PEACE_COST_INFANTRY_CLIENT = gameConstants.PEACE_COST_INFANTRY;
+            PEACE_COST_TANK_CLIENT = gameConstants.PEACE_COST_TANK;
+            PEACE_COST_MECHANIZED_INFANTRY_CLIENT = gameConstants.PEACE_COST_MECHANIZED_INFANTRY;
+            PEACE_COST_BOMBER_CLIENT = gameConstants.PEACE_COST_BOMBER;
+            PEACE_COST_MISSILE_CLIENT = gameConstants.PEACE_COST_MISSILE;
+            PEACE_COST_NUCLEAR_MISSILE_CLIENT = gameConstants.PEACE_COST_NUCLEAR_MISSILE;
+            PEACE_COST_ARTILLERY_CLIENT = gameConstants.PEACE_COST_ARTILLERY;
+            PEACE_COST_OIL_PER_10_CLIENT = gameConstants.PEACE_COST_OIL_PER_10;
+            PEACE_COST_IRON_PER_10_CLIENT = gameConstants.PEACE_COST_IRON_PER_10;
+            PEACE_COST_TERRITORY_CLIENT = gameConstants.PEACE_COST_TERRITORY;
+            document.getElementById('maxRebellionsCount').textContent = gameConstants.MAX_REBELLIONS;
+            BASE_TERRITORY_COST_CLIENT = gameConstants.BASE_TERRITORY_COST;
+        }
+
+        let tutorialStep = 0;
+        let tutorialActive = false;
+
+        const tutorialMessages = [
+            "🎌 ようこそ、国運営ゲームへ！\nこれから国を作っていく方法を説明します！",
+            "まずは「登録する国名」の部分で国名を入力して「国を登録」ボタンを押してください。",
+            "次にサイト一番下の地図上の灰色の地域をクリックして、領土を1つ獲得しましょう！",
+            "登録できたら、軍隊を増強してみましょう。軍隊増強で歩兵を1人追加してみてね。歩兵以外にもいろいろな種類の兵器があるよ",
+            "攻撃モードでは、敵の領土を選んで攻撃できますが、今回は説明だけにしておきます。",
+            "チュートリアル完了！これから自分の戦略で国を発展させていきましょう🌍"
+        ];
+
+        function startTutorial() {
+            tutorialStep = 0;
+            tutorialActive = true;
+            showTutorialBox();
+            nextTutorialStep();
+        }
+
+        function nextTutorialStep() {
+            if (tutorialStep >= tutorialMessages.length) {
+                endTutorial();
+                return;
+            }
+
+            document.getElementById("tutorialText").textContent = tutorialMessages[tutorialStep];
+
+            // 特定のステップに対応する動作を誘導
+            if (tutorialStep === 1) { alert("国名を入力して『国を登録』を押してね！"); }
+            if (tutorialStep === 2) { isRegisteringNation = true; alert("地図上の灰色地域をクリックして領土を選びましょう！"); }
+            if (tutorialStep === 3) { alert("『歩兵』を1人増強してみてください！"); }
+            if (tutorialStep === 4) { alert("攻撃モードの説明：攻撃は他国の領土を奪うための手段です。今回はチュートリアルなので操作しません。"); }
+
+            tutorialStep++;
+        }
+
+        function endTutorial() {
+            tutorialActive = false;
+            hideTutorialBox();
+            alert("🎉 チュートリアル完了！がんばって国を発展させてね！");
+        }
+
+        function showTutorialBox() {
+            document.getElementById("tutorialBox").style.display = "block";
+        }
+
+        function hideTutorialBox() {
+            document.getElementById("tutorialBox").style.display = "none";
+        }
+
+        // New functions for missile mode
+        function startMissileMode() {
+            missileMode = true;
+            nuclearMissileMode = false; // NEW
+            attackMode = false;
+            bombardMode = false;
+            transferMode = false;
+            updateModeStatus();
+        }
+
+        function endMissileMode() {
+            missileMode = false;
+            updateModeStatus();
+        }
+
+        // NEW: Nuclear missile mode functions
+        function startNuclearMissileMode() {
+            nuclearMissileMode = true;
+            missileMode = false;
+            attackMode = false;
+            bombardMode = false;
+            transferMode = false;
+            updateModeStatus();
+        }
+
+        function endNuclearMissileMode() {
+            nuclearMissileMode = false;
+            updateModeStatus();
+        }
+
+        function updateModeStatus() {
+            const statusDiv = document.getElementById("modeStatus");
+            if (!statusDiv) { console.error("Error: Element with ID 'modeStatus' not found in the DOM."); return; }
+
+            if (attackMode) {
+                statusDiv.textContent = "攻撃モード中！敵国の領土をクリックしてください。";
+                statusDiv.style.display = "block";
+            } else if (bombardMode) {
+                statusDiv.textContent = "爆撃モード中！爆撃したい敵領土をクリックしてください。";
+                statusDiv.style.display = "block";
+            } else if (missileMode) {
+                statusDiv.textContent = "ミサイルモード中！ミサイルを発射したい敵領土をクリックしてください。";
+                statusDiv.style.display = "block";
+            } else if (nuclearMissileMode) { // NEW
+                statusDiv.textContent = "核ミサイルモード中！核ミサイルを発射したい敵領土をクリックしてください。";
+                statusDiv.style.display = "block";
+            } else if (transferMode) {
+                statusDiv.textContent = "領土譲渡モード中！譲渡したい領土をクリックしてください。";
+                statusDiv.style.display = "block";
+            } else {
+                statusDiv.style.display = "none";
+            }
+        }
+
+        function startAttackMode() {
+            attackMode = true;
+            bombardMode = false;
+            missileMode = false;
+            nuclearMissileMode = false; // NEW
+            transferMode = false;
+            updateModeStatus();
+        }
+
+        // New functions for bombardment mode
+        function startBombardMode() {
+            bombardMode = true;
+            attackMode = false;
+            missileMode = false;
+            nuclearMissileMode = false; // NEW
+            transferMode = false;
+            updateModeStatus();
+        }
+
+        function endBombardMode() {
+            bombardMode = false;
+            updateModeStatus();
+        }
+
+        function getNationMap() {
+            const map = {};
+            nations.forEach(n => {
+                n.territories.forEach(name => {
+                    map[name] = n;
+                });
+            });
+            return map;
+        }
+
+        function startTransferMode() {
+            transferMode = true;
+            attackMode = false;
+            bombardMode = false;
+            missileMode = false;
+            nuclearMissileMode = false; // NEW
+            updateModeStatus();
+        }
+
+        function endTransferMode() {
+            transferMode = false;
+            updateModeStatus();
+        }
+
+        // ==========================================================
+        // APIクライアント関数
+        // ==========================================================
+
+        async function loadNations() {
+            try {
+                const data = await fetchData('/api/nations');
+                nations = data;
+                nationNameToIpMap = {};
+                nations.forEach(n => { nationNameToIpMap[n.name] = n.owner; });
+
+                const myNation = nations.find(n => n.owner === currentUserIp);
+                const flagUrlInput = document.getElementById('flagUrlInput');
+                const currentFlagImage = document.getElementById('currentFlagImage');
+                const noFlagMessage = document.getElementById('noFlagMessage');
+
+                if (myNation) {
+                    flagUrlInput.value = myNation.flagUrl || '';
+                    if (myNation.flagUrl) {
+                        currentFlagImage.src = myNation.flagUrl;
+                        currentFlagImage.style.display = 'inline-block';
+                        noFlagMessage.style.display = 'none';
+                    } else {
+                        currentFlagImage.src = '';
+                        currentFlagImage.style.display = 'none';
+                        noFlagMessage.style.display = 'block';
+                    }
+                } else {
+                    flagUrlInput.value = '';
+                    currentFlagImage.src = '';
+                    currentFlagImage.style.display = 'none';
+                    noFlagMessage.style.display = 'block';
+                }
+
+                const invasionStatusDiv = document.getElementById('invasionStatus');
+                const startAttackModeBtn = document.getElementById('startAttackModeBtn');
+                const startBombardModeBtn = document.getElementById('startBombardModeBtn');
+                const startMissileModeBtn = document.getElementById('startMissileModeBtn');
+                const startNuclearMissileModeBtn = document.getElementById('startNuclearMissileModeBtn');
+
+                if (invasionStatusDiv) {
+                    if (myNation && myNation.invasionStatus === 'in_progress') {
+                        invasionStatusDiv.style.display = 'block';
+                        if (startAttackModeBtn) startAttackModeBtn.disabled = true;
+                        if (startBombardModeBtn) startBombardModeBtn.disabled = true;
+                        if (startMissileModeBtn) startMissileModeBtn.disabled = true;
+                        if (startNuclearMissileModeBtn) startNuclearMissileModeBtn.disabled = true;
+                    } else {
+                        invasionStatusDiv.style.display = 'none';
+                        if (startAttackModeBtn) startAttackModeBtn.disabled = false;
+                        if (startBombardModeBtn) startBombardModeBtn.disabled = false;
+                        if (startMissileModeBtn) startMissileModeBtn.disabled = false;
+                        if (startNuclearMissileModeBtn) startNuclearMissileModeBtn.disabled = false;
+                    }
+                }
+
+                loadGeoJSON();
+                loadAlliances();
+                loadWars();
+                loadFlightRequests();
+                loadEstablishedFlights();
+                loadNationalFocusStatus();
+                // loadChatMessages(); // setIntervalでロードされる
+                loadOnlineUsers();
+                loadTerritoryRanking();
+            } catch (error) {
+                alert(`国の情報取得中にエラーが発生しました: ${error.message}`);
+            }
+        }
+
+        async function loadGeoJSON() {
+            try {
+                const response = await fetch('/N03-21_210101.json'); // publicフォルダへのパス
+                const geojson = await response.json();
+
+                if (geojsonLayer) map.removeLayer(geojsonLayer);
+
+                const nationMap = getNationMap();
+                geojsonLayer = L.geoJSON(geojson, {
+                    style: feature => {
+                        const name = feature.properties.N03_003;
+                        const nation = nationMap[name];
+                        return {
+                            fillColor: nation ? nation.color : '#ccc',
+                            weight: 1,
+                            color: '#333',
+                            fillOpacity: 0.6,
+                            dashArray: nation ? null : '3',
+                        };
+                    },
+                    onEachFeature: (feature, layer) => {
+                        const props = feature.properties;
+                        const name = props.N03_003;
+                        const nation = nations.find(n => n.territories.includes(name));
+                        layer.bindTooltip(props.N03_003);
+
+                        layer.on('click', async () => {
+                            const clickedCountryName = props.N03_003;
+
+                            if (isRegisteringNation) {
+                                const nationName = document.getElementById('nationNameInput').value.trim();
+                                if (!nationName) { alert("国名が入力されていません。"); return; }
+                                try {
+                                    const result = await fetchData('/api/registerNation', 'POST', { nationName, countryName: clickedCountryName });
+                                    alert(result.message);
+                                    if (result.success) { isRegisteringNation = false; loadNations(); }
+                                } catch (error) { alert(error.message); }
+                                return;
+                            }
+
+                            if (attackMode && nation && nation.owner !== currentUserIp) {
+                                const infantry = parseInt(document.getElementById('attackInfantry').value, 10);
+                                const tank = parseInt(document.getElementById('attackTank').value, 10);
+                                const mechInf = parseInt(document.getElementById('attackMechInf').value, 10);
+                                const artillery = parseInt(document.getElementById('attackArtillery').value, 10);
+                                if (isNaN(infantry) || isNaN(tank) || isNaN(mechInf) || isNaN(artillery) || infantry < 0 || tank < 0 || mechInf < 0 || artillery < 0) {
+                                    alert("攻撃兵力を正しく入力してください"); return;
+                                }
+                                try {
+                                    const result = await fetchData('/api/attackTerritory', 'POST', { targetCountryName: clickedCountryName, attackInfantry: infantry, attackTank: tank, attackMechanizedInfantry: mechInf, attackArtillery: artillery });
+                                    alert(result.message);
+                                    if (result.success) { attackMode = false; updateModeStatus(); loadNations(); loadWars(); }
+                                } catch (error) { alert(error.message); }
+                                return;
+                            } else if (attackMode && nation && nation.owner === currentUserIp) { alert("自分の領土を攻撃することはできません。"); return; }
+
+                            if (bombardMode && nation && nation.owner !== currentUserIp) {
+                                const numberOfBombers = parseInt(document.getElementById('bomberCount').value, 10);
+                                if (isNaN(numberOfBombers) || numberOfBombers <= 0 || numberOfBombers > 100) { alert("爆撃機数を1から100の間で指定してください。"); return; }
+                                if (!confirm(`${props.N03_003}を爆撃機${numberOfBombers}機で爆撃しますか？`)) { return; }
+                                try {
+                                    const result = await fetchData('/api/bombardTerritory', 'POST', { targetCountryName: clickedCountryName, numberOfBombers });
+                                    alert(result.message);
+                                    if (result.success) { bombardMode = false; updateModeStatus(); loadNations(); loadWars(); }
+                                } catch (error) { alert(error.message); }
+                                return;
+                            } else if (bombardMode && nation && nation.owner === currentUserIp) { alert("自分の領土を爆撃することはできません。"); return; }
+
+                            if (missileMode && nation && nation.owner !== currentUserIp) {
+                                const missileCount = parseInt(document.getElementById('missileCount').value, 10);
+                                if (isNaN(missileCount) || missileCount <= 0 || missileCount > 100) { alert("ミサイル発射数は1から100の間で指定してください。"); return; }
+                                if (!confirm(`${props.N03_003}にミサイルを${missileCount}発発射しますか？（即時着弾）`)) { return; }
+                                try {
+                                    const result = await fetchData('/api/launchMissile', 'POST', { targetCountryName: clickedCountryName, numberOfMissiles: missileCount });
+                                    alert(result.message);
+                                    if (result.success) { missileMode = false; updateModeStatus(); loadNations(); loadWars(); }
+                                } catch (error) { alert(error.message); }
+                                return;
+                            } else if (missileMode && nation && nation.owner === currentUserIp) { alert("自分の領土にミサイルを発射することはできません。"); return; }
+
+                            if (nuclearMissileMode && nation && nation.owner !== currentUserIp) {
+                                const nuclearMissileCount = parseInt(document.getElementById('nuclearMissileCount').value, 10);
+                                if (isNaN(nuclearMissileCount) || nuclearMissileCount <= 0 || nuclearMissileCount > 5) { alert("核ミサイル発射数は1から5の間で指定してください。"); return; }
+                                if (!confirm(`${props.N03_003}に核ミサイルを${nuclearMissileCount}発発射しますか？（即時着弾、甚大な被害）`)) { return; }
+                                try {
+                                    const result = await fetchData('/api/launchNuclearMissile', 'POST', { targetCountryName: clickedCountryName, numberOfMissiles: nuclearMissileCount });
+                                    alert(result.message);
+                                    if (result.success) { nuclearMissileMode = false; updateModeStatus(); loadNations(); loadWars(); }
+                                } catch (error) { alert(error.message); }
+                                return;
+                            } else if (nuclearMissileMode && nation && nation.owner === currentUserIp) { alert("自分の領土に核ミサイルを発射することはできません。"); return; }
+
+                            if (transferMode && nation && nation.owner === currentUserIp) {
+                                const targetNationName = document.getElementById("transferNationName").value.trim();
+                                if (!targetNationName) { alert("譲渡先の国名を入力してください。"); return; }
+                                try {
+                                    const result = await fetchData('/api/transferTerritory', 'POST', { territoryName: clickedCountryName, targetNationName });
+                                    alert(result.message);
+                                    if (result.success) { transferMode = false; updateModeStatus(); loadNations(); }
+                                } catch (error) { alert(error.message); }
+                                return;
+                            } else if (transferMode && nation && nation.owner !== currentUserIp) { alert("他国の領土を譲渡することはできません。"); return; }
+
+                            if (nation) {
+                                const isOwner = (nation.owner === currentUserIp);
+                                const displayNationName = getTitleHtml(nation, nation.name);
+
+                                const totalMilitaryPower = (nation.infantry * 2) + (nation.tank * 7) + (nation.mechanizedInfantry * 4) + (nation.artillery * 5);
+                                const defenseRating = nation.territories.length > 0 ? (totalMilitaryPower / nation.territories.length).toFixed(1) : 0;
+
+                                let info = `<b>${displayNationName}</b><br>所持者: ${nation.owner}<br>人口: ${nation.population}<br>`;
+                                if (isOwner) {
+                                    info += `総兵力 - 歩兵: ${nation.infantry}, 戦車: ${nation.tank}, 機械化歩兵: ${nation.mechanizedInfantry}, 砲兵: ${nation.artillery}, 爆撃機: ${nation.bomber}, ミサイル: ${nation.missile}, 核ミサイル: ${nation.nuclearMissile}<br>` +
+                                        `防衛力: ${defenseRating} (総軍備÷領土数)<br>` +
+                                        `お金: ${nation.money}<br>` +
+                                        `鉄道: ${nation.railways}本, 新幹線: ${nation.shinkansen}本, 空港: ${nation.airports}個, 観光施設: ${nation.tourismFacilities}個<br>`;
+                                } else {
+                                    info += `防衛力: ${defenseRating} (総軍備÷領土数)<br>`;
+                                }
+                                info += `石油: ${nation.oil}<br>` + `鉄: ${nation.iron}<br>`;
+                                layer.bindPopup(info).openPopup();
+
+                            } else { // 未所属地の購入
+                                const myNation = nations.find(n => n.owner === currentUserIp);
+                                const currentTerritoryCount = myNation ? myNation.territories.length : 0;
+                                const nextPurchasePrice = (currentTerritoryCount + 1) * BASE_TERRITORY_COST_CLIENT;
+
+                                if (!confirm(`${props.N03_003} は未所属地です。${nextPurchasePrice} お金で購入しますか？`)) { return; }
+                                try {
+                                    const result = await fetchData('/api/buyTerritory', 'POST', { countryName: clickedCountryName });
+                                    alert(result.message);
+                                } catch (error) { alert(error.message); }
+                                loadNations(); // 購入後、再読み込み
+                            }
+                        });
+                    }
+                }).addTo(map);
+            } catch (error) {
+                alert(`地図データの読み込み中にエラーが発生しました: ${error.message}`);
+            }
+        }
+
+        async function reinforce() {
+            const type = document.getElementById('unitType').value;
+            const amount = parseInt(document.getElementById('unitAmount').value, 10);
+            if (isNaN(amount) || amount <= 0) { alert("正しい数量を入力してください"); return; }
+
+            try {
+                const result = await fetchData('/api/reinforceArmy', 'POST', { type, amount });
+                alert(result.message);
+                loadNations();
+            } catch (error) {
+                alert(error.message);
+            }
+        }
+
+        async function buildInfrastructure() {
+            const type = document.getElementById('infrastructureType').value;
+            const amount = parseInt(document.getElementById('infrastructureAmount').value, 10);
+            if (isNaN(amount) || amount <= 0) { alert("正しい数量を入力してください"); return; }
+
+            let costInfo = "";
+            switch (type) {
+                case 'railway': costInfo = `${gameConstants.RAILWAY_COST}円, ${gameConstants.RAILWAY_IRON_COST}鉄, ${gameConstants.RAILWAY_OIL_COST}石油`; break;
+                case 'shinkansen': costInfo = `${gameConstants.SHINKANSEN_COST}円, ${gameConstants.SHINKANSEN_IRON_COST}鉄, ${gameConstants.SHINKANSEN_OIL_COST}石油`; break;
+                case 'airport': costInfo = `${gameConstants.AIRPORT_COST}円, ${gameConstants.AIRPORT_IRON_COST}鉄, ${gameConstants.AIRPORT_OIL_COST}石油`; break;
+                case 'tourismFacility': costInfo = `${gameConstants.TOURISM_FACILITY_COST}円, ${gameConstants.TOURISM_FACILITY_IRON_COST}鉄, ${gameConstants.TOURISM_FACILITY_OIL_COST}石油`; break;
+            }
+
+            if (!confirm(`${amount}個建設しますか？\n(1個あたり: ${costInfo})`)) { return; }
+
+            try {
+                const result = await fetchData('/api/buildInfrastructure', 'POST', { type, amount });
+                alert(result.message);
+                loadNations();
+            } catch (error) {
+                alert(error.message);
+            }
+        }
+
+        async function requestFlight() {
+            const targetNationName = document.getElementById('flightTargetNationName').value.trim();
+            if (!targetNationName) { alert("飛行機便申請先の国名を入力してください。"); return; }
+            try {
+                const result = await fetchData('/api/requestFlight', 'POST', { targetNationName });
+                alert(result.message);
+                loadFlightRequests();
+            } catch (error) { alert(error.message); }
+        }
+
+        async function respondToFlightRequest(requesterIp, response) {
+            try {
+                const result = await fetchData('/api/respondToFlightRequest', 'POST', { requesterIp, response });
+                alert(result.message);
+                loadFlightRequests();
+                loadEstablishedFlights();
+                loadNations();
+            } catch (error) { alert(error.message); }
+        }
+
+        async function loadFlightRequests() {
+            try {
+                const data = await fetchData('/api/getPendingFlightRequests');
+                const pendingList = document.getElementById('pendingFlightRequests');
+                pendingList.innerHTML = '';
+                if (data.length === 0) {
+                    pendingList.innerHTML = '<li>現在、あなたへの飛行機便申請はありません。</li>';
+                } else {
+                    data.forEach(req => {
+                        const li = document.createElement('li');
+                        li.innerHTML = `${req.requesterNationName} からの申請 <button onclick="respondToFlightRequest('${req.requesterIp}', 'approve')">承認</button> <button onclick="respondToFlightRequest('${req.requesterIp}', 'reject')">拒否</button>`;
+                        pendingList.appendChild(li);
+                    });
+                }
+            } catch (error) { console.error('飛行機便申請の読み込みエラー:', error); }
+        }
+
+        async function loadEstablishedFlights() {
+            try {
+                const data = await fetchData('/api/getEstablishedFlights');
+                const establishedList = document.getElementById('establishedFlights');
+                establishedList.innerHTML = '';
+                if (data.length === 0) {
+                    establishedList.innerHTML = '<li>現在、確立された飛行機便はありません。</li>';
+                } else {
+                    data.forEach(flight => {
+                        const li = document.createElement('li');
+                        li.textContent = `${flight.targetNationName} (${flight.status === 'approved' ? '承認済み' : flight.status})`;
+                        establishedList.appendChild(li);
+                    });
+                }
+            } catch (error) { console.error('確立された飛行機便の読み込みエラー:', error); }
+        }
+
+        async function spy() {
+            const target = document.getElementById('spyTargetNation').value.trim();
+            if (!target) { alert("スパイ対象の国名を入力してください。"); return; }
+            const resultDiv = document.getElementById('spyResult');
+            try {
+                const res = await fetchData('/api/spyNation', 'POST', { targetNationName: target });
+                let info = res.info;
+                resultDiv.innerHTML = `
+                <p>スパイ成功！ ${res.message}</p>
+                <p>歩兵: ${info.infantry}体</p>
+                <p>戦車: ${info.tank}台</p>
+                <p>機械化歩兵: ${info.mechanizedInfantry}体</p>
+                <p>砲兵: ${info.artillery}体</p>
+                <p>爆撃機: ${info.bomber}機</p>
+                <p>ミサイル: ${info.missile}機</p>
+                <p>核ミサイル: ${info.nuclearMissile}機</p>
+                <p>お金: ${info.money}円</p>
+                <p>石油: ${info.oil}個</p>
+                <p>鉄: ${info.iron}個</p>
+                <p>鉄道: ${info.railways}本</p>
+                <p>新幹線: ${info.shinkansen}本</p>
+                <p>空港: ${info.airports}個</p>
+                <p>観光施設: ${info.tourismFacilities}個</p>
+            `;
+            } catch (error) {
+                alert(error.message);
+                resultDiv.innerHTML = "";
+            }
+        }
+
+        async function sabotage() {
+            const target = document.getElementById('sabotageTargetNation').value.trim();
+            if (!target) { alert("破壊工作対象の国名を入力してください。"); return; }
+            if (!confirm(`破壊工作を実行しますか？\nコスト: ${SABOTAGE_COST_CLIENT}円 (失敗時: 追加で${SABOTAGE_FAILURE_COST_CLIENT - SABOTAGE_COST_CLIENT}円)`)) { return; }
+            try {
+                const result = await fetchData('/api/sabotageNation', 'POST', { targetNationName: target });
+                alert(result.message);
+                loadNations();
+            } catch (error) {
+                alert(error.message);
+            }
+        }
+
+        async function sendResourcesByName() {
+            const name = document.getElementById("targetNationName").value.trim();
+            const type = document.getElementById("resourceType").value;
+            const amount = document.getElementById("resourceAmount").value;
+
+            if (!name) { alert("相手の国名を入力してください"); return; }
+
+            try {
+                const res = await fetchData('/api/transferResourcesByName', 'POST', { toNationName: name, type, amount });
+                alert(res.message);
+                loadNations();
+            } catch (error) {
+                alert(error.message);
+            }
+        }
+
+        async function loadNews() {
+            try {
+                const newsArray = await fetchData('/api/news');
+                const list = document.getElementById("newsList");
+                list.innerHTML = "";
+                newsArray.forEach(line => {
+                    const li = document.createElement("li");
+                    li.textContent = line;
+                    list.insertBefore(li, list.firstChild);
+                });
+            } catch (error) { console.error('ニュースの読み込みエラー:', error); }
+        }
+
+        function getTitleHtml(nationObject, nationName) {
+            let flagHtml = '';
+            if (nationObject && nationObject.flagUrl) {
+                flagHtml = `<img src="${nationObject.flagUrl}" alt="Flag" class="flag-icon" onerror="this.style.display='none'"> `;
+            }
+
+            if (!nationObject || !nationObject.selectedTitleId || !titleDefinitions[nationObject.selectedTitleId]) {
+                return `${flagHtml}${nationName}`;
+            }
+            const titleInfo = titleDefinitions[nationObject.selectedTitleId];
+            const glowStyle = `text-shadow: 0 0 5px ${titleInfo.color}, 0 0 10px ${titleInfo.color}, 0 0 15px ${titleInfo.color}; color: ${titleInfo.color};`;
+            return `${flagHtml}<span class="glowing-text" style="${glowStyle}">【${titleInfo.name}】</span> ${nationName}`;
+        }
+
+        async function loadChatMessages() {
+            try {
+                const messages = await fetchData('/api/chatMessages');
+                const chatLog = document.getElementById("chatLog");
+                const shouldScroll = chatLog.scrollTop + chatLog.clientHeight === chatLog.scrollHeight || chatLog.scrollTop === 0;
+
+                chatLog.innerHTML = "";
+                messages.forEach(msg => {
+                    const p = document.createElement("p");
+                    const mockNationObject = { selectedTitleId: msg.selectedTitleId, flagUrl: msg.flagUrl };
+                    const displayNationNameWithTitle = getTitleHtml(mockNationObject, msg.nationName);
+
+                    p.innerHTML = `<span class="chat-time">[${msg.time}]</span> <span class="chat-name">${displayNationNameWithTitle}:</span> ${msg.message}`;
+                    chatLog.appendChild(p);
+                });
+
+                if (shouldScroll) {
+                    chatLog.scrollTop = chatLog.scrollHeight;
+                }
+            } catch (error) { console.error('チャットメッセージの読み込みエラー:', error); }
+        }
+
+        async function sendChatMessage() {
+            const input = document.getElementById("chatInput");
+            const message = input.value.trim();
+            if (message) {
+                try {
+                    await fetchData('/api/postChatMessage', 'POST', { message });
+                    input.value = "";
+                    loadChatMessages();
+                } catch (error) {
+                    alert(error.message);
+                }
+            }
+        }
+
+        // --- Alliance JavaScript Functions ---
+        async function requestAlliance() {
+            const targetNationName = document.getElementById('allianceTargetNationName').value.trim();
+            if (!targetNationName) { alert("同盟申請先の国名を入力してください。"); return; }
+            try {
+                const result = await fetchData('/api/requestAlliance', 'POST', { targetNationName });
+                alert(result.message);
+                loadAlliances();
+            } catch (error) { alert(error.message); }
+        }
+
+        async function respondToAllianceRequest(requesterIp, response) {
+            try {
+                const result = await fetchData('/api/respondToAllianceRequest', 'POST', { requesterIp, response });
+                alert(result.message);
+                loadAlliances();
+            } catch (error) { alert(error.message); }
+        }
+
+        async function loadAlliances() {
+            try {
+                const data = await fetchData('/api/getAlliances');
+                const pendingList = document.getElementById('pendingAllianceRequests');
+                pendingList.innerHTML = '';
+                if (data.pendingRequests.length === 0) {
+                    pendingList.innerHTML = '<li>現在、あなたへの同盟申請はありません。</li>';
+                } else {
+                    data.pendingRequests.forEach(req => {
+                        const li = document.createElement('li');
+                        li.innerHTML = `${req.requesterNationName} からの申請 <button onclick="respondToAllianceRequest('${req.requesterIp}', 'approve')">承認</button> <button onclick="respondToAllianceRequest('${req.requesterIp}', 'reject')">拒否</button>`;
+                        pendingList.appendChild(li);
+                    });
+                }
+
+                const currentList = document.getElementById('currentAlliances');
+                currentList.innerHTML = '';
+                if (data.approvedAlliances.length === 0) {
+                    currentList.innerHTML = '<li>現在、同盟国はいません。</li>';
+                } else {
+                    data.approvedAlliances.forEach(alliance => {
+                        const li = document.createElement('li');
+                        li.innerHTML = `${alliance.nationName} <button onclick="dissolveAlliance('${alliance.ip}')">解除</button>`;
+                        currentList.appendChild(li);
+                    });
+                }
+            } catch (error) { console.error('同盟情報の読み込みエラー:', error); }
+        }
+
+        async function dissolveAlliance(alliedNationIp) {
+            if (confirm('本当にこの同盟を解除しますか？')) {
+                try {
+                    const result = await fetchData('/api/dissolveAlliance', 'POST', { alliedNationIp });
+                    alert(result.message);
+                    loadAlliances();
+                } catch (error) { alert(error.message); }
+            }
+        }
+
+        async function loadOnlineUsers() {
+            try {
+                const onlineUsersData = await fetchData('/api/getOnlineUserNames');
+                const list = document.getElementById("onlineUsersList");
+                list.innerHTML = "";
+
+                if (onlineUsersData.length === 0) {
+                    list.innerHTML = "<li>現在、オンラインのプレイヤーはいません。</li>";
+                } else {
+                    onlineUsersData.forEach(userData => {
+                        const li = document.createElement("li");
+                        const mockNationObject = { selectedTitleId: userData.selectedTitleId, flagUrl: userData.flagUrl };
+                        const displayNationName = getTitleHtml(mockNationObject, userData.nationName);
+                        li.innerHTML = displayNationName;
+                        list.appendChild(li);
+                    });
+                }
+            } catch (error) { console.error('オンラインユーザーの読み込みエラー:', error); }
+        }
+
+        async function loadTerritoryRanking() {
+            try {
+                const rankingData = await fetchData('/api/getTerritoryRanking');
+                const list = document.getElementById("territoryRankingList");
+                list.innerHTML = "";
+                if (rankingData.length === 0) {
+                    list.innerHTML = "<li>ランキングデータがありません。</li>";
+                } else {
+                    rankingData.forEach((nation, index) => {
+                        const li = document.createElement("li");
+                        const mockNationObject = { selectedTitleId: nation.selectedTitleId, flagUrl: nation.flagUrl };
+                        const displayNationName = getTitleHtml(mockNationObject, nation.name);
+                        li.innerHTML = `${index + 1}. ${displayNationName} (${nation.territories}領土)`;
+                        list.appendChild(li);
+                    });
+                }
+            } catch (error) { console.error('領土ランキングの読み込みエラー:', error); }
+        }
+
+        async function changeNationInfo() {
+            const newName = document.getElementById('newNationNameInput').value.trim();
+            const newColor = document.getElementById('newNationColorInput').value;
+
+            if (!newName && newColor === '#4a90e2') { // #4a90e2はHTMLで設定されたデフォルト色
+                alert("新しい国名か新しい色のどちらかを入力してください。");
+                return;
+            }
+
+            try {
+                const result = await fetchData('/api/updateNationInfo', 'POST', { newName, newColor });
+                alert(result.message);
+                if (result.success) { loadNations(); }
+            } catch (error) { alert(error.message); }
+        }
+
+        async function updateFlagFromUrl() {
+            const newFlagUrl = document.getElementById('flagUrlInput').value.trim();
+            try {
+                const result = await fetchData('/api/updateNationFlag', 'POST', { newFlagUrl });
+                alert(result.message);
+                if (result.success) { loadNations(); }
+            } catch (error) { alert(error.message); }
+        }
+
+        document.getElementById('flagFileInput').addEventListener('change', async function(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = async function(e) {
+                    const base64String = e.target.result;
+                    try {
+                        const result = await fetchData('/api/updateNationFlag', 'POST', { newFlagUrl: base64String });
+                        alert(result.message);
+                        if (result.success) { loadNations(); }
+                    } catch (error) { alert(error.message); }
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        async function attemptRebellion() {
+            const targetCountryName = document.getElementById('rebellionTargetCountryName').value.trim();
+            if (!targetCountryName) { alert("反乱を起こす領土名を入力してください。"); return; }
+            if (!confirm(`${targetCountryName}で反乱を起こしますか？（あなたは現在領土を所有していない必要があります）`)) { return; }
+            try {
+                const result = await fetchData('/api/attemptRebellion', 'POST', { targetCountryName });
+                alert(result.message);
+                if (result.success) { loadNations(); }
+            } catch (error) { alert(error.message); }
+        }
+
+        async function declareWar() {
+            const targetNationName = document.getElementById('warTargetNationName').value.trim();
+            if (!targetNationName) { alert("宣戦布告対象の国名を入力してください。"); return; }
+            if (!confirm(`${targetNationName}に宣戦布告しますか？`)) { return; }
+            try {
+                const result = await fetchData('/api/declareWar', 'POST', { targetNationName });
+                alert(result.message);
+                if (result.success) { loadWars(); }
+            } catch (error) { alert(error.message); }
+        }
+
+        async function proposeCeasefire(warId) {
+            if (!confirm(`この戦争の停戦を提案しますか？`)) { return; }
+            try {
+                const result = await fetchData('/api/proposeCeasefire', 'POST', { warId });
+                alert(result.message);
+                if (result.success) { loadWars(); }
+            } catch (error) { alert(error.message); }
+        }
+
+        async function acceptCeasefire(warId) {
+            if (!confirm(`この停戦提案を承認しますか？`)) { return; }
+            try {
+                const result = await fetchData('/api/acceptCeasefire', 'POST', { warId });
+                alert(result.message);
+                if (result.success) { loadWars(); }
+            } catch (error) { alert(error.message); }
+        }
+
+        async function rejectCeasefire(warId, proposerName) {
+            if (!confirm(`${proposerName}からの停戦提案を拒否しますか？戦争が継続します。`)) { return; }
+            try {
+                const result = await fetchData('/api/rejectCeasefire', 'POST', { warId });
+                alert(result.message);
+                if (result.success) { loadWars(); }
+            } catch (error) { alert(error.message); }
+        }
+
+        async function proposeWhitePeace(warId) {
+            if (!confirm(`この戦争の白紙講和を提案しますか？（承認されると領土は戦争前の状態に戻ります）`)) { return; }
+            try {
+                const result = await fetchData('/api/proposeWhitePeace', 'POST', { warId });
+                alert(result.message);
+                if (result.success) { loadWars(); }
+            } catch (error) { alert(error.message); }
+        }
+
+        async function acceptWhitePeace(warId) {
+            if (!confirm(`この白紙講和提案を承認しますか？（領土は戦争前の状態に戻り、戦争が終了します）`)) { return; }
+            try {
+                const result = await fetchData('/api/acceptWhitePeace', 'POST', { warId });
+                alert(result.message);
+                if (result.success) { loadWars(); loadNations(); }
+            } catch (error) { alert(error.message); }
+        }
+
+        async function rejectWhitePeace(warId, proposerName) {
+            if (!confirm(`${proposerName}からの白紙講和提案を拒否しますか？戦争が継続します。`)) { return; }
+            try {
+                const result = await fetchData('/api/rejectWhitePeace', 'POST', { warId });
+                alert(result.message);
+                if (result.success) { loadWars(); }
+            } catch (error) { alert(error.message); }
+        }
+
+        async function cancelWar(warId) {
+            if (!confirm(`この戦争を中止しますか？（講和会議なしで終了）`)) { return; }
+            try {
+                const result = await fetchData('/api/cancelWar', 'POST', { warId });
+                alert(result.message);
+                if (result.success) { loadWars(); loadNations(); }
+            } catch (error) { alert(error.message); }
+        }
+
+        async function loadWars() {
+            if (!currentUserIp) { console.warn('⚠ currentUserIp が設定されていません。loadWars を中止します。'); return; }
+
+            try {
+                const data = await fetchData('/api/getUserWars');
+                const activeWarsList = document.getElementById('activeWarsList');
+                const ceasefireProposalsList = document.getElementById('ceasefireProposalsList');
+                const whitePeaceProposalsList = document.getElementById('whitePeaceProposalsList');
+
+                activeWarsList.innerHTML = '';
+                ceasefireProposalsList.innerHTML = '';
+                whitePeaceProposalsList.innerHTML = '';
+
+                if (data && Array.isArray(data.activeWars)) {
+                    if (data.activeWars.length === 0) {
+                        activeWarsList.innerHTML = '<li>現在、進行中の戦争はありません。</li>';
+                    } else {
+                        data.activeWars.forEach(war => {
+                            const li = document.createElement('li');
+                            const isMyWar = (war.attackerIp === currentUserIp || war.defenderIp === currentUserIp);
+
+                            let warStatusText = {
+                                'Declared': '<span class="war-status-declared">宣戦布告済み</span>',
+                                'Ongoing': '<span class="war-status-ongoing">戦争中</span>',
+                                'Ceasefire': '<span class="war-status-ceasefire">停戦中</span>',
+                                'Ended': '<span class="war-status-ended">終了</span>',
+                                'Cancelled': '<span class="war-status-cancelled">中止</span>',
+                                'WhitePeaceProposed': '<span class="war-status-whitepeaceproposed">白紙講和提案中</span>'
+                            }[war.status] || '';
+
+                            li.innerHTML = `
+                                <b>${war.attackerNationName}</b> vs <b>${war.defenderNationName}</b> (${warStatusText}) <br>
+                                <small>スコア: ${war.attackerNationName}: ${war.attackerWarScore} - ${war.defenderNationName}: ${war.defenderWarScore}</small>
+                            `;
+
+                            let buttonsHtml = '';
+                            if (isMyWar) {
+                                if ((war.status === 'Declared' || war.status === 'Ongoing') && war.ceasefireProposedBy !== currentUserIp) {
+                                    buttonsHtml += `<button onclick="proposeCeasefire('${war.warId}')" style="margin-left: 10px; padding: 5px 10px; font-size: 0.8em;"><i class="fas fa-handshake"></i> 停戦提案</button>`;
+                                    buttonsHtml += `<button onclick="proposeWhitePeace('${war.warId}')" style="margin-left: 10px; padding: 5px 10px; font-size: 0.8em; background-color: #800080;"><i class="fas fa-peace"></i> 白紙講和提案</button>`;
+                                } else if ((war.status === 'Declared' || war.status === 'Ongoing') && war.ceasefireProposedBy === currentUserIp) {
+                                    buttonsHtml += `<span style="margin-left: 10px; color: #6c757d; font-size: 0.8em;">停戦提案済み</span>`;
+                                } else if (war.status === WAR_STATUS_WHITE_PEACE_PROPOSED && war.ceasefireProposedBy === currentUserIp) {
+                                    buttonsHtml += `<span style="margin-left: 10px; color: #6c757d; font-size: 0.8em;">白紙講和提案済み</span>`;
+                                }
+
+                                if (war.status === 'Ceasefire' && war.attackerIp === currentUserIp) { // 講和会議は勝者から
+                                    const myWarScore = war.attackerIp === currentUserIp ? war.attackerWarScore : war.defenderWarScore;
+                                    const opponentWarScore = war.attackerIp === currentUserIp ? war.defenderWarScore : war.attackerWarScore;
+                                    if (myWarScore > opponentWarScore) { // 自分が勝者なら
+                                        buttonsHtml += `<button onclick="openPeaceConferenceModal('${war.warId}')" style="margin-left: 10px; padding: 5px 10px; font-size: 0.8em; background-color: #28a745;"><i class="fas fa-gavel"></i> 講和会議</button>`;
+                                    }
+                                }
+                                if (war.status === 'Ceasefire' && war.defenderIp === currentUserIp) { // 講和会議は勝者から
+                                    const myWarScore = war.attackerIp === currentUserIp ? war.attackerWarScore : war.defenderWarScore;
+                                    const opponentWarScore = war.attackerIp === currentUserIp ? war.defenderWarScore : war.attackerWarScore;
+                                    if (myWarScore > opponentWarScore) { // 自分が勝者なら
+                                        buttonsHtml += `<button onclick="openPeaceConferenceModal('${war.warId}')" style="margin-left: 10px; padding: 5px 10px; font-size: 0.8em; background-color: #28a745;"><i class="fas fa-gavel"></i> 講和会議</button>`;
+                                    }
+                                }
+                            }
+
+                            li.innerHTML += buttonsHtml;
+                            activeWarsList.appendChild(li);
+                        });
+                    }
+                }
+
+                if (data && Array.isArray(data.ceasefireProposals)) {
+                    if (data.ceasefireProposals.length === 0) {
+                        ceasefireProposalsList.innerHTML = '<li>現在、あなたへの停戦提案はありません。</li>';
+                    } else {
+                        data.ceasefireProposals.forEach(proposal => {
+                            const li = document.createElement('li');
+                            const proposerName = (proposal.attackerIp === proposal.ceasefireProposedBy) ? proposal.attackerNationName : proposal.defenderNationName;
+                            li.innerHTML = `
+                                <b>${proposal.attackerNationName}</b> vs <b>${proposal.defenderNationName}</b> - 提案者: ${proposerName}
+                                <button onclick="acceptCeasefire('${proposal.warId}')" style="margin-left: 10px; padding: 5px 10px; font-size: 0.8em; background-color: #28a745;"><i class="fas fa-check"></i> 承認</button>
+                                <button onclick="rejectCeasefire('${proposal.warId}', '${proposerName}')" style="margin-left: 5px; padding: 5px 10px; font-size: 0.8em; background-color: #dc3545;"><i class="fas fa-times"></i> 拒否</button>
+                            `;
+                            ceasefireProposalsList.appendChild(li);
+                        });
+                    }
+                }
+
+                if (data && Array.isArray(data.whitePeaceProposals)) {
+                    if (data.whitePeaceProposals.length === 0) {
+                        whitePeaceProposalsList.innerHTML = '<li>現在、あなたへの白紙講和提案はありません。</li>';
+                    } else {
+                        data.whitePeaceProposals.forEach(proposal => {
+                            const li = document.createElement('li');
+                            const proposerName = (proposal.attackerIp === proposal.ceasefireProposedBy) ? proposal.attackerNationName : proposal.defenderNationName;
+                            li.innerHTML = `
+                                <b>${proposal.attackerNationName}</b> vs <b>${proposal.defenderNationName}</b> - 提案者: ${proposerName}
+                                <button onclick="acceptWhitePeace('${proposal.warId}')" style="margin-left: 10px; padding: 5px 10px; font-size: 0.8em; background-color: #28a745;"><i class="fas fa-check"></i> 承認</button>
+                                <button onclick="rejectWhitePeace('${proposal.warId}', '${proposerName}')" style="margin-left: 5px; padding: 5px 10px; font-size: 0.8em; background-color: #dc3545;"><i class="fas fa-times"></i> 拒否</button>
+                            `;
+                            whitePeaceProposalsList.appendChild(li);
+                        });
+                    }
+                }
+            } catch (error) {
+                console.error("🛑 戦争データ読み込みエラー:", error.message, error.stack);
+                activeWarsList.innerHTML = '<li>データの読み込み中にエラーが発生しました: ' + error.message + '</li>';
+                ceasefireProposalsList.innerHTML = '<li>データの読み込み中にエラーが発生しました: ' + error.message + '</li>';
+                whitePeaceProposalsList.innerHTML = '<li>データの読み込み中にエラーが発生しました: ' + error.message + '</li>';
+            }
+        }
+
+        // --- Peace Conference Modal Functions ---
+        async function openPeaceConferenceModal(warId) {
+            try {
+                const result = await fetchData('/api/startPeaceConference', 'POST', { warId });
+                if (!result.success) { alert(result.message); return; }
+                currentPeaceConferenceWar = result;
+
+                document.getElementById('pcWarId').textContent = result.war.warId;
+                document.getElementById('pcWinnerNation').textContent = result.winnerNationName;
+                document.getElementById('pcLoserNation').textContent = result.loserNationName;
+                document.getElementById('pcAvailableWarPoints').textContent = result.availableWarPoints;
+
+                document.getElementById('pcMoney').max = result.loserCurrentMoney;
+                document.getElementById('pcMoney').value = 0;
+                document.getElementById('pcLoserMoney').textContent = result.loserCurrentMoney;
+
+                document.getElementById('pcOil').max = result.loserCurrentOil;
+                document.getElementById('pcOil').value = 0;
+                document.getElementById('pcLoserOil').textContent = result.loserCurrentOil;
+
+                document.getElementById('pcIron').max = result.loserCurrentIron;
+                document.getElementById('pcIron').value = 0;
+                document.getElementById('pcLoserIron').textContent = result.loserCurrentIron;
+
+                document.getElementById('pcInfantry').max = result.loserCurrentInfantry;
+                document.getElementById('pcInfantry').value = 0;
+                document.getElementById('pcLoserInfantry').textContent = result.loserCurrentInfantry;
+
+                document.getElementById('pcTank').max = result.loserCurrentTank;
+                document.getElementById('pcTank').value = 0;
+                document.getElementById('pcLoserTank').textContent = result.loserCurrentTank;
+
+                document.getElementById('pcMechanizedInfantry').max = result.loserCurrentMechanizedInfantry;
+                document.getElementById('pcMechanizedInfantry').value = 0;
+                document.getElementById('pcLoserMechanizedInfantry').textContent = result.loserCurrentMechanizedInfantry;
+
+                document.getElementById('pcArtillery').max = result.loserCurrentArtillery;
+                document.getElementById('pcArtillery').value = 0;
+                document.getElementById('pcLoserArtillery').textContent = result.loserCurrentArtillery;
+
+                document.getElementById('pcBomber').max = result.loserCurrentBomber;
+                document.getElementById('pcBomber').value = 0;
+                document.getElementById('pcLoserBomber').textContent = result.loserCurrentBomber;
+
+                document.getElementById('pcMissile').max = result.loserCurrentMissile;
+                document.getElementById('pcMissile').value = 0;
+                document.getElementById('pcLoserMissile').textContent = result.loserCurrentMissile;
+
+                document.getElementById('pcNuclearMissile').max = result.loserCurrentNuclearMissile;
+                document.getElementById('pcNuclearMissile').value = 0;
+                document.getElementById('pcLoserNuclearMissile').textContent = result.loserCurrentNuclearMissile;
+
+                const territoriesSelect = document.getElementById('peaceDemandsTerritories');
+                territoriesSelect.innerHTML = '';
+                result.loserTerritories.forEach(territory => {
+                    const option = document.createElement('option');
+                    option.value = territory;
+                    option.textContent = territory;
+                    territoriesSelect.appendChild(option);
+                });
+
+                calculatePeaceDemandsCost();
+                document.getElementById('peaceConferenceModal').style.display = 'block';
+
+            } catch (error) { alert(error.message); }
+        }
+
+        function closePeaceConferenceModal() {
+            document.getElementById('peaceConferenceModal').style.display = 'none';
+            currentPeaceConferenceWar = null;
+            loadWars();
+            loadNations();
+        }
+
+        function calculatePeaceDemandsCost() {
+            let totalCost = 0;
+
+            const moneyInput = document.getElementById('pcMoney');
+            const oilInput = document.getElementById('pcOil');
+            const ironInput = document.getElementById('pcIron');
+            const infantryInput = document.getElementById('pcInfantry');
+            const tankInput = document.getElementById('pcTank');
+            const mechanizedInfantryInput = document.getElementById('pcMechanizedInfantry');
+            const artilleryInput = document.getElementById('pcArtillery');
+            const bomberInput = document.getElementById('pcBomber');
+            const missileInput = document.getElementById('pcMissile');
+            const nuclearMissileInput = document.getElementById('pcNuclearMissile');
+
+            const money = moneyInput ? (parseInt(moneyInput.value) || 0) : 0;
+            const oil = oilInput ? (parseInt(oilInput.value) || 0) : 0;
+            const iron = ironInput ? (parseInt(ironInput.value) || 0) : 0;
+            const infantry = infantryInput ? (parseInt(infantryInput.value) || 0) : 0;
+            const tank = tankInput ? (parseInt(tankInput.value) || 0) : 0;
+            const mechanizedInfantry = mechanizedInfantryInput ? (parseInt(mechanizedInfantryInput.value) || 0) : 0;
+            const artillery = artilleryInput ? (parseInt(artilleryInput.value) || 0) : 0;
+            const bomber = bomberInput ? (parseInt(bomberInput.value) || 0) : 0;
+            const missile = missileInput ? (parseInt(missileInput.value) || 0) : 0;
+            const nuclearMissile = nuclearMissileInput ? (parseInt(nuclearMissileInput.value) || 0) : 0;
+
+            const territoriesSelect = document.getElementById('peaceDemandsTerritories');
+            const selectedTerritories = territoriesSelect ? Array.from(territoriesSelect.selectedOptions).map(option => option.value) : [];
+
+            const moneyCost = Math.ceil(money / 1000) * PEACE_COST_MONEY_PER_1000_CLIENT;
+            const oilCost = Math.ceil(oil / 10) * PEACE_COST_OIL_PER_10_CLIENT;
+            const ironCost = Math.ceil(iron / 10) * PEACE_COST_IRON_PER_10_CLIENT;
+            const infantryCost = infantry * PEACE_COST_INFANTRY_CLIENT;
+            const tankCost = tank * PEACE_COST_TANK_CLIENT;
+            const mechanizedInfantryCost = mechanizedInfantry * PEACE_COST_MECHANIZED_INFANTRY_CLIENT;
+            const artilleryCost = artillery * PEACE_COST_ARTILLERY_CLIENT;
+            const bomberCost = bomber * PEACE_COST_BOMBER_CLIENT;
+            const missileCost = missile * PEACE_COST_MISSILE_CLIENT;
+            const nuclearMissileCost = nuclearMissile * PEACE_COST_NUCLEAR_MISSILE_CLIENT;
+            const territoryCost = selectedTerritories.length * PEACE_COST_TERRITORY_CLIENT;
+
+            totalCost = moneyCost + oilCost + ironCost + infantryCost + tankCost + mechanizedInfantryCost + artilleryCost + bomberCost + missileCost + nuclearMissileCost + territoryCost;
+
+            if (document.getElementById('pcMoneyCost')) document.getElementById('pcMoneyCost').textContent = moneyCost;
+            if (document.getElementById('pcOilCost')) document.getElementById('pcOilCost').textContent = oilCost;
+            if (document.getElementById('pcIronCost')) document.getElementById('pcIronCost').textContent = ironCost;
+            if (document.getElementById('pcInfantryCost')) document.getElementById('pcInfantryCost').textContent = infantryCost;
+            if (document.getElementById('pcTankCost')) document.getElementById('pcTankCost').textContent = tankCost;
+            if (document.getElementById('pcMechanizedInfantryCost')) document.getElementById('pcMechanizedInfantryCost').textContent = mechanizedInfantryCost;
+            if (document.getElementById('pcArtilleryCost')) document.getElementById('pcArtilleryCost').textContent = artilleryCost;
+            if (document.getElementById('pcBomberCost')) document.getElementById('pcBomberCost').textContent = bomberCost;
+            if (document.getElementById('pcMissileCost')) document.getElementById('pcMissileCost').textContent = missileCost;
+            if (document.getElementById('pcNuclearMissileCost')) document.getElementById('pcNuclearMissileCost').textContent = nuclearMissileCost;
+            if (document.getElementById('pcTerritoryCost')) document.getElementById('pcTerritoryCost').textContent = territoryCost;
+            if (document.getElementById('pcDemandsCost')) document.getElementById('pcDemandsCost').textContent = totalCost;
+
+            return totalCost;
+        }
+
+        async function makePeaceDemands() {
+            const warId = document.getElementById('pcWarId').textContent;
+            const totalCost = calculatePeaceDemandsCost();
+            const availableWarPoints = parseInt(document.getElementById('pcAvailableWarPoints').textContent);
+
+            if (totalCost > availableWarPoints) {
+                alert(`戦勝点が足りません。要求総コスト: ${totalCost}, 利用可能戦勝点: ${availableWarPoints}`);
+                return;
+            }
+
+            if (!confirm(`合計${totalCost}戦勝点を消費して、これらの要求を確定しますか？`)) { return; }
+
+            const demands = {
+                money: parseInt(document.getElementById('pcMoney').value) || 0,
+                oil: parseInt(document.getElementById('pcOil').value) || 0,
+                iron: parseInt(document.getElementById('pcIron').value) || 0,
+                infantry: parseInt(document.getElementById('pcInfantry').value) || 0,
+                tank: parseInt(document.getElementById('pcTank').value) || 0,
+                mechanizedInfantry: parseInt(document.getElementById('pcMechanizedInfantry').value) || 0,
+                artillery: parseInt(document.getElementById('pcArtillery').value) || 0,
+                bomber: parseInt(document.getElementById('pcBomber').value) || 0,
+                missile: parseInt(document.getElementById('pcMissile').value) || 0,
+                nuclearMissile: parseInt(document.getElementById('pcNuclearMissile').value) || 0,
+                territories: Array.from(document.getElementById('peaceDemandsTerritories').selectedOptions).map(option => option.value)
+            };
+
+            try {
+                const result = await fetchData('/api/makePeaceDemands', 'POST', { warId, demands });
+                alert(result.message);
+                if (result.success) { closePeaceConferenceModal(); }
+            } catch (error) { alert(error.message); }
+        }
+
+        // --- NEW: National Focus JavaScript Functions ---
+        async function loadNationalFocusStatus() {
+            try {
+                const result = await fetchData('/api/getAvailableNationalFocuses');
+                const currentStatusDiv = document.getElementById('currentFocusStatus');
+                const focusNameSpan = document.getElementById('focusName');
+                const focusDescriptionSpan = document.getElementById('focusDescription');
+                const focusProgressP = document.getElementById('focusProgress');
+                const focusTurnsRemainingSpan = document.getElementById('focusTurnsRemaining');
+                const availableFocusesList = document.getElementById('availableFocuses');
+                const resetFocusBtn = document.getElementById('resetFocusBtn');
+
+                if (!result.success && !result.activeFocus) { // activeFocusがない場合もエラー表示
+                    currentStatusDiv.className = 'no-focus';
+                    focusNameSpan.textContent = 'エラー';
+                    focusDescriptionSpan.textContent = result.message;
+                    focusProgressP.style.display = 'none';
+                    availableFocusesList.innerHTML = `<li>${result.message}</li>`;
+                    resetFocusBtn.style.display = 'none';
+                    return;
+                }
+
+                if (result.activeFocus) {
+                    currentStatusDiv.className = '';
+                    focusNameSpan.textContent = result.activeFocus.name;
+                    focusDescriptionSpan.textContent = result.activeFocus.description;
+                    focusProgressP.style.display = 'block';
+
+                    const myNation = nations.find(n => n.owner === currentUserIp);
+                    if (myNation) {
+                        focusTurnsRemainingSpan.textContent = myNation.focusTurnsRemaining;
+                    } else {
+                        focusTurnsRemainingSpan.textContent = 'N/A';
+                    }
+                    resetFocusBtn.style.display = 'inline-block';
+                } else {
+                    currentStatusDiv.className = 'no-focus';
+                    focusNameSpan.textContent = 'なし';
+                    focusDescriptionSpan.textContent = '国家方針を選択して、国を強化しましょう。';
+                    focusProgressP.style.display = 'none';
+                    resetFocusBtn.style.display = 'none';
+                }
+
+                availableFocusesList.innerHTML = '';
+                if (result.focuses && result.focuses.length > 0) {
+                    result.focuses.forEach(focus => {
+                        const li = document.createElement('li');
+                        li.className = 'focus-item';
+                        let effectsText = '';
+                        for (const effectKey in focus.effects) {
+                            const value = focus.effects[effectKey];
+                            if (effectKey === 'ironProductionBonus') effectsText += `鉄生産+${value * 100}%, `;
+                            else if (effectKey === 'oilProductionBonus') effectsText += `石油生産+${value * 100}%, `;
+                            else if (effectKey === 'moneyProductionBonus') effectsText += `お金生産+${value * 100}%, `;
+                            else if (effectKey === 'infantryPowerBonus') effectsText += `歩兵戦闘力+${value}, `;
+                            else if (effectKey === 'tankPowerBonus') effectsText += `戦車戦闘力+${value}, `;
+                            else if (effectKey === 'mechanizedInfantryPowerBonus') effectsText += `機械化歩兵戦闘力+${value}, `;
+                            else if (effectKey === 'populationGrowthBonus') effectsText += `人口増加率+${(value * 100).toFixed(2)}%, `;
+                            else if (effectKey === 'missileCostReduction') effectsText += `ミサイルコスト-${value * 100}%, `;
+                            else if (effectKey === 'bomberCostReduction') effectsText += `爆撃機コスト-${value * 100}%, `;
+                            else if (effectKey === 'defenseBonusIncrease') effectsText += `防衛ボーナス+${(value * 100).toFixed(2)}%, `;
+                        }
+                        effectsText = effectsText.slice(0, -2);
+
+                        let prerequisitesText = '';
+                        if (focus.prerequisites && focus.prerequisites.length > 0) {
+                            const prereqNames = focus.prerequisites.map(id => nationalFocusDefinitionsClient[id] ? nationalFocusDefinitionsClient[id].name : id).join(', ');
+                            prerequisitesText = `<p><strong>前提条件:</strong> ${prereqNames}</p>`;
+                        }
+
+                        let exclusiveWithText = '';
+                        if (focus.exclusiveWith && focus.exclusiveWith.length > 0) {
+                            const exclusiveNames = focus.exclusiveWith.map(id => nationalFocusDefinitionsClient[id] ? nationalFocusDefinitionsClient[id].name : id).join(', ');
+                            exclusiveWithText = `<p><strong>排他方針:</strong> ${exclusiveNames}</p>`;
+                        }
+
+                        li.innerHTML = `
+                            <h4>${focus.name}</h4>
+                            <p>${focus.description}</p>
+                            <p class="cost">所要ターン: ${focus.costTurns}ターン</p>
+                            <p><strong>効果:</strong> ${effectsText}</p>
+                            ${prerequisitesText}
+                            ${exclusiveWithText}
+                            <button onclick="startFocus('${focus.id}')">開始</button>
+                        `;
+                        availableFocusesList.appendChild(li);
+                    });
+                } else if (!result.activeFocus) {
+                    availableFocusesList.innerHTML = '<li>現在、利用可能な国家方針はありません。</li>';
+                }
+            } catch (error) { console.error('国家方針ステータスロードエラー:', error); }
+        }
+
+        async function startFocus(focusId) {
+            if (confirm('国家方針「' + focusId + '」を開始しますか？')) {
+                try {
+                    const result = await fetchData('/api/startNationalFocus', 'POST', { focusId });
+                    alert(result.message);
+                    if (result.success) {
+                        loadNationalFocusStatus();
+                        loadNations();
+                    }
+                } catch (error) { alert(error.message); }
+            }
+        }
+
+        async function resetFocus() {
+            if (confirm('国家方針をリセットしますか？ (完了した方針もクリアされます)')) {
+                try {
+                    const result = await fetchData('/api/resetNationalFocus', 'POST');
+                    alert(result.message);
+                    if (result.success) {
+                        loadNationalFocusStatus();
+                        loadNations();
+                    }
+                } catch (error) { alert(error.message); }
+            }
+        }
+
+        // --- Title Management Functions (Client-side) ---
+        async function loadTitleDefinitions() {
+            try {
+                titleDefinitions = await fetchData('/api/titleDefinitions');
+            } catch (error) { console.error('称号定義の読み込みエラー:', error); }
+        }
+
+        async function loadUserTitlesManagement() {
+            try {
+                const data = await fetchData('/api/getUserTitlesData');
+                const currentDisplayTitleSpan = document.getElementById('currentDisplayTitle');
+                const acquiredTitlesSelect = document.getElementById('acquiredTitlesSelect');
+
+                acquiredTitlesSelect.innerHTML = '';
+
+                if (data.acquiredTitles.length === 0) {
+                    acquiredTitlesSelect.innerHTML = '<option value="">称号を所有していません</option>';
+                    currentDisplayTitleSpan.textContent = 'なし';
+                    return;
+                }
+
+                let currentTitleName = 'なし';
+                if (data.selectedTitleId && titleDefinitions[data.selectedTitleId]) {
+                    currentTitleName = titleDefinitions[data.selectedTitleId].name;
+                }
+                currentDisplayTitleSpan.textContent = currentTitleName;
+
+                data.acquiredTitles.forEach(titleId => {
+                    if (titleDefinitions[titleId]) {
+                        const option = document.createElement('option');
+                        option.value = titleId;
+                        option.textContent = titleDefinitions[titleId].name;
+                        if (titleId === data.selectedTitleId) {
+                            option.selected = true;
+                        }
+                        acquiredTitlesSelect.appendChild(option);
+                    }
+                });
+            } catch (error) { console.error('ユーザー称号情報の読み込みエラー:', error); }
+        }
+
+        async function selectDisplayTitle() {
+            const selectedTitleId = document.getElementById('acquiredTitlesSelect').value;
+            if (!selectedTitleId) { alert("表示する称号を選択してください。"); return; }
+            try {
+                const result = await fetchData('/api/selectDisplayTitle', 'POST', { titleId: selectedTitleId });
+                alert(result.message);
+                if (result.success) {
+                    loadUserTitlesManagement();
+                    loadNations();
+                }
+            } catch (error) { alert(error.message); }
+        }
+
+        async function grantTestTitle() {
+            const titleIdToGrant = prompt("付与する称号のIDを入力してください (例: emperor, warlord):");
+            if (titleIdToGrant) {
+                try {
+                    const result = await fetchData('/api/grantTitleToUser', 'POST', { targetUserIp: currentUserIp, titleId: titleIdToGrant });
+                    alert(result.message);
+                    if (result.success) {
+                        loadUserTitlesManagement();
+                        loadNations();
+                    }
+                } catch (error) { alert(error.message); }
+            }
+        }
+
+        // ==========================================================
+        // ページロード時の初期化と定期実行
+        // ==========================================================
+        window.onload = async () => {
+            try {
+                // ユーザーIPの取得
+                const ipData = await fetchData('/api/user/ip');
+                currentUserIp = ipData.ip;
+                console.log('Current User IP:', currentUserIp);
+
+                // ゲーム定数のロード
+                gameConstants = await fetchData('/api/gameConstants');
+                updateCostDisplays(); // コスト表示の更新を最初に1回実行
+
+                // 国家方針と称号定義のロード
+                nationalFocusDefinitionsClient = await fetchData('/api/nationalFocusDefinitions');
+                await loadTitleDefinitions(); // 称号定義がloadNationsより先に必要
+
+                // すべての依存関係がロードされた後に他のロード関数を実行
+                loadNations(); // これがGeoJSON、オンラインユーザー、ランキングなどをトリガー
+                loadChatMessages();
+                loadAlliances();
+                loadFlightRequests();
+                loadEstablishedFlights();
+                loadNationalFocusStatus();
+                loadTerritoryRanking();
+                loadWars();
+                loadUserTitlesManagement();
+
+
+                // 定期実行 (クライアント側での画面更新用)
+                setInterval(loadNations, 7000);
+                setInterval(loadChatMessages, 5000);
+                setInterval(loadAlliances, 10000);
+                setInterval(loadFlightRequests, 10000);
+                setInterval(loadEstablishedFlights, 10000);
+                setInterval(loadOnlineUsers, 15000);
+                setInterval(loadNationalFocusStatus, 7000);
+                setInterval(loadTerritoryRanking, 10000);
+                setInterval(loadUserTitlesManagement, 10000);
+
+                // BGM再生
+                const bgm = new Audio("https://www.mod.go.jp/gsdf/fan/sound/download/bunretsu_koshin.mp3");
+                bgm.loop = true;
+                // ブラウザの自動再生ポリシーにより、ユーザーインタラクションがないと再生されない場合があるため
+                document.body.addEventListener("click", function() {
+                    bgm.play().catch(e => console.log("BGM自動再生失敗:", e));
+                }, { once: true });
+
+            } catch (error) {
+                console.error('初期ロードエラー:', error);
+                alert(`ゲームの初期化中にエラーが発生しました: ${error.message}`);
+            }
+        };
+
+    </script>
+</body>
+</html>
