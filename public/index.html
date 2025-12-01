@@ -1946,7 +1946,7 @@
                 updateCostDisplays(); // コスト表示の更新を最初に1回実行
 
                 // 国家方針と称号定義のロード
-                nationalFocusDefinitionsClient = await fetchData('/api/nationalFocusDefinitions');
+                nationalFocusDefinitionsClient = await fetchData('/api/getAvailableNationalFocuses');
                 await loadTitleDefinitions(); // 称号定義がloadNationsより先に必要
 
                 // すべての依存関係がロードされた後に他のロード関数を実行
