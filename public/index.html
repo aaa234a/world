@@ -1976,13 +1976,7 @@
                 setInterval(loadTerritoryRanking, 10000);
                 setInterval(loadUserTitlesManagement, 10000);
 
-                // BGM再生
-                const bgm = new Audio("https://www.mod.go.jp/gsdf/fan/sound/download/bunretsu_koshin.mp3");
-                bgm.loop = true;
-                // ブラウザの自動再生ポリシーにより、ユーザーインタラクションがないと再生されない場合があるため
-                document.body.addEventListener("click", function() {
-                    bgm.play().catch(e => console.log("BGM自動再生失敗:", e));
-                }, { once: true });
+
 
             } catch (error) {
                 console.error('初期ロードエラー:', error);
