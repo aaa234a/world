@@ -4892,12 +4892,14 @@ app.get("/api/getUserTitlesData", async (req, res) => {
     const userNation = await Nation.findOne({ owner: userIp }).select(
       "acquiredTitles selectedTitleId"
     );
-    if (!userNation)
-      return res.status(404).json({
-        acquiredTitles: [],
-        selectedTitleId: "",
-        message: "あなたの国が見つかりません。",
+    if (!userNation) {
+      return res.json({
+        success: true,
+        message: "あなたの国が見つかりませんでした。",
+        focuses: [],
+        activeFocus: null,
       });
+    }
 
     res.json({
       acquiredTitles: userNation.acquiredTitles,
