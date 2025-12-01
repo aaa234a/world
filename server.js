@@ -5356,7 +5356,7 @@ async function processFlights() {
   }
 }
 
-cron.schedule("*/5 * * * *", async () => {
+cron.schedule("*/1 * * * *", async () => {
   console.log("20分ごとに定期アップデート実行...");
   await addIncomePerMinute();
   await addResourcesPerMinute();
