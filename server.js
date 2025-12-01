@@ -654,7 +654,9 @@ async function addNews(message) {
 const ALWAYS_ALLOWED_IPS = ["127.0.0.1", "::1"]; // テスト用、またはゲーム管理者IPなど
 const authenticateUser = (req, res, next) => {
   let ip =
-    req.headers["x-forwarded-for"] || req.connection.remoteAddress || req.ip;
+    req.headers["x-forwarded-for"]?.split(",")[0].trim() ||
+    req.connection.remoteAddress ||
+    req.ip;
   if (ip && ip.startsWith("::ffff:")) {
     // IPv6形式のIPv4アドレスの場合
     ip = ip.substring(7);
