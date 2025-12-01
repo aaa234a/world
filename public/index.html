@@ -908,7 +908,7 @@
                 const nationMap = getNationMap();
                 geojsonLayer = L.geoJSON(geojson, {
                     style: feature => {
-                        const name = feature.properties.N03_003;
+                        const name = feature.properties.N03_004;
                         const nation = nationMap[name];
                         return {
                             fillColor: nation ? nation.color : '#ccc',
@@ -920,12 +920,12 @@
                     },
                     onEachFeature: (feature, layer) => {
                         const props = feature.properties;
-                        const name = props.N03_003;
+                        const name = props.N03_004;
                         const nation = nations.find(n => n.territories.includes(name));
-                        layer.bindTooltip(props.N03_003);
+                        layer.bindTooltip(props.N03_004);
 
                         layer.on('click', async () => {
-                            const clickedCountryName = props.N03_003;
+                            const clickedCountryName = props.N03_004;
 
                             if (isRegisteringNation) {
                                 const nationName = document.getElementById('nationNameInput').value.trim();
@@ -957,7 +957,7 @@
                             if (bombardMode && nation && nation.owner !== currentUserIp) {
                                 const numberOfBombers = parseInt(document.getElementById('bomberCount').value, 10);
                                 if (isNaN(numberOfBombers) || numberOfBombers <= 0 || numberOfBombers > 100) { alert("爆撃機数を1から100の間で指定してください。"); return; }
-                                if (!confirm(`${props.N03_003}を爆撃機${numberOfBombers}機で爆撃しますか？`)) { return; }
+                                if (!confirm(`${props.N03_004}を爆撃機${numberOfBombers}機で爆撃しますか？`)) { return; }
                                 try {
                                     const result = await fetchData('/api/bombardTerritory', 'POST', { targetCountryName: clickedCountryName, numberOfBombers });
                                     alert(result.message);
@@ -969,7 +969,7 @@
                             if (missileMode && nation && nation.owner !== currentUserIp) {
                                 const missileCount = parseInt(document.getElementById('missileCount').value, 10);
                                 if (isNaN(missileCount) || missileCount <= 0 || missileCount > 100) { alert("ミサイル発射数は1から100の間で指定してください。"); return; }
-                                if (!confirm(`${props.N03_003}にミサイルを${missileCount}発発射しますか？（即時着弾）`)) { return; }
+                                if (!confirm(`${props.N03_004}にミサイルを${missileCount}発発射しますか？（即時着弾）`)) { return; }
                                 try {
                                     const result = await fetchData('/api/launchMissile', 'POST', { targetCountryName: clickedCountryName, numberOfMissiles: missileCount });
                                     alert(result.message);
@@ -981,7 +981,7 @@
                             if (nuclearMissileMode && nation && nation.owner !== currentUserIp) {
                                 const nuclearMissileCount = parseInt(document.getElementById('nuclearMissileCount').value, 10);
                                 if (isNaN(nuclearMissileCount) || nuclearMissileCount <= 0 || nuclearMissileCount > 5) { alert("核ミサイル発射数は1から5の間で指定してください。"); return; }
-                                if (!confirm(`${props.N03_003}に核ミサイルを${nuclearMissileCount}発発射しますか？（即時着弾、甚大な被害）`)) { return; }
+                                if (!confirm(`${props.N03_004}に核ミサイルを${nuclearMissileCount}発発射しますか？（即時着弾、甚大な被害）`)) { return; }
                                 try {
                                     const result = await fetchData('/api/launchNuclearMissile', 'POST', { targetCountryName: clickedCountryName, numberOfMissiles: nuclearMissileCount });
                                     alert(result.message);
@@ -1025,7 +1025,7 @@
                                 const currentTerritoryCount = myNation ? myNation.territories.length : 0;
                                 const nextPurchasePrice = (currentTerritoryCount + 1) * BASE_TERRITORY_COST_CLIENT;
 
-                                if (!confirm(`${props.N03_003} は未所属地です。${nextPurchasePrice} お金で購入しますか？`)) { return; }
+                                if (!confirm(`${props.N03_004} は未所属地です。${nextPurchasePrice} お金で購入しますか？`)) { return; }
                                 try {
                                     const result = await fetchData('/api/buyTerritory', 'POST', { countryName: clickedCountryName });
                                     alert(result.message);
