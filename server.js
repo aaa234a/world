@@ -2967,12 +2967,6 @@ app.get("/api/getAvailableNationalFocuses", async (req, res) => {
 
   try {
     const userNation = await Nation.findOne({ owner: userIp });
-    if (!userNation)
-      return res.status(404).json({
-        success: false,
-        message: "あなたの国が見つかりません。",
-        focuses: [],
-      });
 
     if (userNation.activeFocusId) {
       const activeFocus = NATIONAL_FOCUSES[userNation.activeFocusId];
