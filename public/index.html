@@ -390,7 +390,6 @@
             <input type="text" id="chatInput" placeholder="メッセージを入力..." style="width: calc(100% - 90px);" onkeydown="if(event.key === 'Enter') sendChatMessage();">
             <button onclick="sendChatMessage()" style="width: 80px;"><i class="fas fa-paper-plane"></i> 送信</button>
         </div>
-        
     </div>
 
     <div class="card">
@@ -526,7 +525,7 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         // ==========================================================
-        // クライアントサイド JavaScript のコード (client.jsの内容をここに直接記述)
+        // クライアントサイド JavaScript のコード
         // ==========================================================
 
         let nationalFocusDefinitionsClient = {};
@@ -620,6 +619,7 @@
         }
 
         // コスト表示を更新する関数
+        // updateCostDisplays関数は前の応答で提供済み (そのまま使用)
         function updateCostDisplays() {
             if (!gameConstants) return;
             document.getElementById('infantryCost').textContent = gameConstants.INFANTRY_COST;
@@ -673,6 +673,9 @@
             BASE_TERRITORY_COST_CLIENT = gameConstants.BASE_TERRITORY_COST;
         }
 
+        // ==========================================================
+        // チュートリアル
+        // ==========================================================
         let tutorialStep = 0;
         let tutorialActive = false;
 
@@ -1520,17 +1523,10 @@
                                     buttonsHtml += `<span style="margin-left: 10px; color: #6c757d; font-size: 0.8em;">白紙講和提案済み</span>`;
                                 }
 
-                                if (war.status === 'Ceasefire' && war.attackerIp === currentUserIp) { // 講和会議は勝者から
+                                if (war.status === 'Ceasefire') {
                                     const myWarScore = war.attackerIp === currentUserIp ? war.attackerWarScore : war.defenderWarScore;
                                     const opponentWarScore = war.attackerIp === currentUserIp ? war.defenderWarScore : war.attackerWarScore;
-                                    if (myWarScore > opponentWarScore) { // 自分が勝者なら
-                                        buttonsHtml += `<button onclick="openPeaceConferenceModal('${war.warId}')" style="margin-left: 10px; padding: 5px 10px; font-size: 0.8em; background-color: #28a745;"><i class="fas fa-gavel"></i> 講和会議</button>`;
-                                    }
-                                }
-                                if (war.status === 'Ceasefire' && war.defenderIp === currentUserIp) { // 講和会議は勝者から
-                                    const myWarScore = war.attackerIp === currentUserIp ? war.attackerWarScore : war.defenderWarScore;
-                                    const opponentWarScore = war.attackerIp === currentUserIp ? war.defenderWarScore : war.attackerWarScore;
-                                    if (myWarScore > opponentWarScore) { // 自分が勝者なら
+                                    if (myWarScore > opponentWarScore) {
                                         buttonsHtml += `<button onclick="openPeaceConferenceModal('${war.warId}')" style="margin-left: 10px; padding: 5px 10px; font-size: 0.8em; background-color: #28a745;"><i class="fas fa-gavel"></i> 講和会議</button>`;
                                     }
                                 }
@@ -1694,7 +1690,7 @@
             const artilleryCost = artillery * PEACE_COST_ARTILLERY_CLIENT;
             const bomberCost = bomber * PEACE_COST_BOMBER_CLIENT;
             const missileCost = missile * PEACE_COST_MISSILE_CLIENT;
-            const nuclearMissileCost = nuclearMissile * PEACE_COST_NUCLEAR_MISSILE_CLIENT;
+            const nuclearMissileCost = nuclearMissile * PEACE_COST_NUCLEAR_MISSIILE_CLIENT;
             const territoryCost = selectedTerritories.length * PEACE_COST_TERRITORY_CLIENT;
 
             totalCost = moneyCost + oilCost + ironCost + infantryCost + tankCost + mechanizedInfantryCost + artilleryCost + bomberCost + missileCost + nuclearMissileCost + territoryCost;
@@ -1963,6 +1959,7 @@
                 loadTerritoryRanking();
                 loadWars();
                 loadUserTitlesManagement();
+
 
 
                 // 定期実行 (クライアント側での画面更新用)
