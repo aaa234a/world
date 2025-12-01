@@ -5364,9 +5364,8 @@ async function processFlights() {
   }
 }
 
-// 1分ごとに実行されるように設定 (GASの addIncomePerMinute と processNationalFocusProgress を統合)
-cron.schedule("* * * * *", async () => {
-  console.log("毎分定期アップデート実行...");
+cron.schedule("*/30 * * * *", async () => {
+  console.log("20分ごとに定期アップデート実行...");
   await addIncomePerMinute();
   await addResourcesPerMinute();
   await processNationalFocusProgress();
