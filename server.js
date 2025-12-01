@@ -5096,42 +5096,6 @@ app.get("/api/news", async (req, res) => {
   }
 });
 
-// GET /api/checkTimeServer
-app.get("/api/checkTimeServer", (req, res) => {
-  const userIp = req.userIp;
-  const today = new Date();
-  const day = today.getDay(); // 0=日曜, 1=月曜,...,6=土曜
-  const timeInMinutes = today.getHours() * 60 + today.getMinutes();
-
-  // 特定ユーザーは常にプレイ可能 (テスト用、または管理者IP)
-  if (ALWAYS_ALLOWED_IPS.includes(userIp)) return res.json({ status: "ok" });
-
-  // 祝日判定 (Node.jsでは外部APIまたは手動管理が必要。今回は簡易的にfalse)
-  const isHoliday = false; // Placeholder for actual holiday check
-
-  // 土日・祝日は常にOK
-  if (day === 0 || day === 6 || isHoliday) return res.json({ status: "ok" });
-
-  // プレイ不可時間（分単位）
-  let blockedTimes = [
-    [8 * 60 + 45, 9 * 60 + 30],
-    [9 * 60 + 35, 10 * 60 + 20],
-    [10 * 60 + 40, 11 * 60 + 25],
-    [11 * 60 + 30, 12 * 60 + 25],
-  ];
-
-  // 水曜日以外は午後もプレイ不可
-  if (day !== 3) {
-    blockedTimes.push([13 * 60 + 30, 14 * 60 + 15]);
-    blockedTimes.push([14 * 60 + 20, 15 * 60 + 15]);
-  }
-
-  const isBlocked = blockedTimes.some(
-    (range) => timeInMinutes >= range[0] && timeInMinutes <= range[1]
-  );
-  res.json({ status: isBlocked ? "blocked" : "ok" });
-});
-
 // ==========================================================
 // 定期実行処理（GASの `processTurnlyUpdates` に対応）
 // ==========================================================
@@ -5392,7 +5356,7 @@ async function processFlights() {
   }
 }
 
-cron.schedule("*/30 * * * *", async () => {
+cron.schedule("*/5 * * * *", async () => {
   console.log("20分ごとに定期アップデート実行...");
   await addIncomePerMinute();
   await addResourcesPerMinute();
