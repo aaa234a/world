@@ -900,7 +900,7 @@
 
         async function loadGeoJSON() {
             try {
-                const response = await fetch('https://raw.githubusercontent.com/smartnews-smri/japan-topography/refs/heads/main/data/constituency/geojson/s0001/senkyoku289polygon.json'); // publicフォルダへのパス
+                const response = await fetch('https://raw.githubusercontent.com/smartnews-smri/japan-topography/refs/heads/main/data/municipality/geojson/s0001/N03-21_210101.json'); // publicフォルダへのパス
                 const geojson = await response.json();
 
                 if (geojsonLayer) map.removeLayer(geojsonLayer);
