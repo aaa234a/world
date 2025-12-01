@@ -4881,33 +4881,40 @@ app.get("/api/titleDefinitions", (req, res) => {
 // GET /api/getUserTitlesData
 app.get("/api/getUserTitlesData", async (req, res) => {
   const userIp = req.userIp;
-  if (!userIp)
-    return res.status(401).json({
+  if (!userIp) {
+    return res.json({
+      success: true,
       acquiredTitles: [],
       selectedTitleId: "",
-      message: "IPアドレスが取得できません。",
+      message: "IPアドレスが取得できなかったため、称号情報はありません。",
     });
+  }
 
   try {
     const userNation = await Nation.findOne({ owner: userIp }).select(
       "acquiredTitles selectedTitleId"
     );
+
+    // 国が見つからなくても error にせず空データ返す
     if (!userNation) {
       return res.json({
         success: true,
+        acquiredTitles: [],
+        selectedTitleId: "",
         message: "あなたの国が見つかりませんでした。",
-        focuses: [],
-        activeFocus: null,
       });
     }
 
     res.json({
+      success: true,
       acquiredTitles: userNation.acquiredTitles,
       selectedTitleId: userNation.selectedTitleId,
+      message: "称号情報を取得しました。",
     });
   } catch (error) {
     console.error("getUserTitlesData エラー:", error);
     res.status(500).json({
+      success: false,
       acquiredTitles: [],
       selectedTitleId: "",
       message: "称号情報の取得中にエラーが発生しました。",
