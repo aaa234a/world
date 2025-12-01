@@ -1194,18 +1194,26 @@
             }
         }
 
-        async function loadNews() {
-            try {
-                const newsArray = await fetchData('/api/news');
-                const list = document.getElementById("newsList");
-                list.innerHTML = "";
-                newsArray.forEach(line => {
-                    const li = document.createElement("li");
-                    li.textContent = line;
-                    list.insertBefore(li, list.firstChild);
-                });
-            } catch (error) { console.error('ニュースの読み込みエラー:', error); }
+async function loadNews() {
+    try {
+        const newsArray = await fetchData('/api/news');
+        const list = document.getElementById("newsList");
+
+        list.innerHTML = "";
+
+        // 前から表示したいなら単純に逆順にループ
+        for (let i = newsArray.length - 1; i >= 0; i--) {
+            const li = document.createElement("li");
+            li.textContent = String(newsArray[i]); // 型安全
+            list.appendChild(li);
         }
+
+    } catch (error) { 
+        console.error('ニュースの読み込みエラー:', error);
+        const list = document.getElementById("newsList");
+        list.innerHTML = "<li>ニュースを読み込めませんでした</li>";
+    }
+}
 
         function getTitleHtml(nationObject, nationName) {
             let flagHtml = '';
