@@ -2617,7 +2617,7 @@ app.post("/api/launchMissile", async (req, res) => {
         ? defenderNation.artillery / defenderTerritoryCount
         : 0;
 
-    const populationLossPerMissile = 3000;
+    const populationLossPerMissile = 10000;
     const totalPopulationLoss = populationLossPerMissile * numberOfMissiles;
     const destructionRatePerMissile = 0.5;
     const totalDestructionRate = Math.min(
