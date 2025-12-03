@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>HOI4 Viewer — SVGベース</title>
+  <style>
+    body{font-family:system-ui, -apple-system, 'Segoe UI', Roboto, 'Hiragino Kaku Gothic ProN', 'Noto Sans JP'; margin:0; display:flex; height:100vh}
+    #sidebar{width:320px; padding:16px; box-sizing:border-box; border-right:1px solid #ddd; overflow:auto}
+    #mapWrap{flex:1; position:relative; background:#111}
+    #mapContainer{width:100%; height:100%; overflow:hidden}
+    svg{width:100%; height:100%; display:block}
+    .prov-hover{stroke:#fff; stroke-width:2; filter:drop-shadow(0 0 6px rgba(0,0,0,0.8))}
+    .legend-item{display:flex; align-items:center; gap:8px; margin:6px 0}
+    .color-box{width:20px; height:14px; border:1px solid #999}
+    .controls{display:flex; gap:8px; margin-bottom:8px}
+    button{padding:6px 8px; cursor:pointer}
+    input[type=search]{flex:1; padding:6px}
+    .tooltip{position:absolute; pointer-events:none; background:rgba(0,0,0,0.8); color:#fff; padding:6px 8px; border-radius:6px; font-size:13px; display:none}
+  </style>
+</head>
+<body>
+  <div id="sidebar">
+    <h2>HOI4 ビューア</h2>
+    <p>このページはSVG（色と地名）を使って国を推定し、インタラクティブな地図として表示します。</p>
+
+    <div class="controls">
+      <input id="search" type="search" placeholder="地名で検索..." />
+      <button id="zoomTo">検索</button>
+    </div>
+
+    <div id="legend"><strong>判別された国（色 → 国名）</strong><div id="legendList"></div></div>
+    <hr />
+    <div><strong>操作</strong>
+      <ul>
+        <li>地図上で領土をクリックすると、その領域の属する国名を表示します。</li>
+        <li>ホバーで領域名を確認できます（SVGにテキストがある場合）。</li>
+        <li>検索で地名を探してズーム。</li>
+      </ul>
+    </div>
+    <hr />
+    <div id="info"><strong>情報</strong><div id="infoBody">SVGをロード中…</div></div>
+  </div>
+
+  <div id="mapWrap">
+    <div id="mapContainer"> <!-- SVG をここに挿入 -->
+      <div id="svgHolder"></div>
+    </div>
+    <div class="tooltip" id="tt"></div>
+  </div>
+
+<script>
+(async function(){
+  const svgUrl = 'merged.svg'; // 同じディレクトリにSVGを置いてください
+  const infoBody = document.getElementById('infoBody');
+  try{
+    const res = await fetch(svgUrl);
+    if(!res.ok) throw new Error('SVGのロードに失敗: ' + res.status);
+    const svgText = await res.text();
+    // SVGをDOMへ挿入
+    const holder = document.getElementById('svgHolder');
+    holder.innerHTML = svgText;
+
+    // ルートSVG要素
+    const svg = holder.querySelector('svg');
+    if(!svg) throw new Error('SVGタグが見つかりません');
+
+    // ビューを整える
+    svg.setAttribute('preserveAspectRatio','xMidYMid meet');
+
+    // 1) すべての描画要素（path, rect, polygon, circle, g など）を取得
+    const provinceSelectors = ['path','rect','polygon','circle','ellipse'];
+    let provinces = [];
+    provinceSelectors.forEach(sel => provinces.push(...Array.from(svg.querySelectorAll(sel))));
+
+    // フォントや補助テキスト要素
+    const texts = Array.from(svg.querySelectorAll('text'));
+
+    // 2) テキストをプロビンスに紐づける試み（テキスト座標がその領域のBBoxに含まれるか近いものを探す）
+    // prepare bboxes for provinces
+    const provinceBBoxes = provinces.map(p => {
+      try{ const b = p.getBBox(); return {el:p, bbox:b}; }catch(e){ return {el:p,bbox:null}; }
+    });
+
+    // helper: find province containing point
+    function provinceContaining(x,y){
+      for(const pb of provinceBBoxes){
+        const b = pb.bbox;
+        if(!b) continue;
+        if(x >= b.x && x <= b.x + b.width && y >= b.y && y <= b.y + b.height) return pb.el;
+      }
+      return null;
+    }
+
+    // 3) 色 -> 地名 のマッピングを作る
+    const colorToNames = {}; // color (hex/rgba) -> set of names
+
+    texts.forEach(t => {
+      const name = (t.textContent || '').trim();
+      if(!name) return;
+      // テキストの位置
+      let x = t.getAttribute('x');
+      let y = t.getAttribute('y');
+      if(x === null || y === null){
+        // try bbox center
+        try{ const tb = t.getBBox(); x = tb.x + tb.width/2; y = tb.y + tb.height/2; }
+        catch(e){ return; }
+      }
+      x = parseFloat(x); y = parseFloat(y);
+      const prov = provinceContaining(x,y);
+      if(prov){
+        const fill = getComputedStyle(prov).fill || prov.getAttribute('fill') || prov.style.fill || '';
+        const color = normalizeColor(fill) || '#undefined';
+        if(!colorToNames[color]) colorToNames[color] = new Set();
+        colorToNames[color].add(name);
+        // attach metadata
+        prov.dataset.provNames = prov.dataset.provNames ? prov.dataset.provNames + '|' + name : name;
+      }
+    });
+
+    // Fallback: if no texts matched, try grouping by exact fill colors and use first text found inside bbox of each color
+    if(Object.keys(colorToNames).length === 0){
+      provinces.forEach(p => {
+        const fill = getComputedStyle(p).fill || p.getAttribute('fill') || p.style.fill || '';
+        const color = normalizeColor(fill) || '#undefined';
+        // find text whose center is in bbox
+        let foundName = null;
+        try{
+          const b = p.getBBox();
+          for(const t of texts){
+            try{ const tb = t.getBBox();
+              const tx = tb.x + tb.width/2, ty = tb.y + tb.height/2;
+              if(tx >= b.x && tx <= b.x+b.width && ty >= b.y && ty <= b.y+b.height){ foundName = (t.textContent||'').trim(); break; }
+            }catch(e){}
+          }
+        }catch(e){}
+        if(foundName){ if(!colorToNames[color]) colorToNames[color]=new Set(); colorToNames[color].add(foundName); }
+      });
+    }
+
+    // Normalize to simple mapping: a color -> representative country name (join multiple names with comma)
+    const colorToCountry = {};
+    Object.entries(colorToNames).forEach(([c,s]) => {
+      colorToCountry[c] = Array.from(s).slice(0,5).join(', ');
+    });
+
+    // Build legend UI
+    const legendList = document.getElementById('legendList');
+    legendList.innerHTML = '';
+    Object.keys(colorToCountry).forEach(c => {
+      const div = document.createElement('div'); div.className='legend-item';
+      const box = document.createElement('div'); box.className='color-box'; box.style.background = c;
+      const label = document.createElement('div'); label.textContent = c + ' → ' + colorToCountry[c];
+      div.appendChild(box); div.appendChild(label);
+      legendList.appendChild(div);
+    });
+
+    infoBody.innerHTML = 'Loaded: ' + provinces.length + ' shapes, ' + texts.length + ' text labels.';
+
+    // Interaction: hover and click
+    const tooltip = document.getElementById('tt');
+    function showTooltip(evt, html){ tooltip.style.display='block'; tooltip.innerHTML=html; const r=8; const x=evt.clientX + r; const y=evt.clientY + r; tooltip.style.left = x + 'px'; tooltip.style.top = y + 'px'; }
+    function hideTooltip(){ tooltip.style.display='none'; }
+
+    provinces.forEach(p => {
+      p.style.cursor='pointer';
+      p.addEventListener('mouseenter', e=>{
+        p.classList.add('prov-hover');
+        const fill = getComputedStyle(p).fill || p.getAttribute('fill') || p.style.fill || '';
+        const color = normalizeColor(fill) || '#undefined';
+        const name = colorToCountry[color] || p.dataset.provNames || '(不明)';
+        showTooltip(e, '<strong>'+name+'</strong><br/>' + color);
+      });
+      p.addEventListener('mousemove', e=>{ showTooltip(e, tooltip.innerHTML); });
+      p.addEventListener('mouseleave', e=>{ p.classList.remove('prov-hover'); hideTooltip(); });
+      p.addEventListener('click', e=>{
+        const fill = getComputedStyle(p).fill || p.getAttribute('fill') || p.style.fill || '';
+        const color = normalizeColor(fill) || '#undefined';
+        const country = colorToCountry[color] || p.dataset.provNames || '(不明)';
+        // highlight all provinces with same color
+        provinces.forEach(q=> q.style.opacity = (normalizeColor(getComputedStyle(q).fill || q.getAttribute('fill') || q.style.fill || '') === color) ? '1' : '0.25');
+        document.getElementById('infoBody').innerHTML = '選択: ' + country + ' ('+color+')';
+      });
+    });
+
+    // Search
+    document.getElementById('zoomTo').addEventListener('click', ()=>{
+      const q = document.getElementById('search').value.trim(); if(!q) return;
+      // find text that matches
+      let found = null;
+      for(const t of texts){ if((t.textContent||'').toLowerCase().includes(q.toLowerCase())){ found = t; break; } }
+      if(!found){ alert('地名が見つかりませんでした'); return; }
+      // get center
+      try{
+        const tb = found.getBBox(); const cx = tb.x + tb.width/2; const cy = tb.y + tb.height/2;
+        zoomToPoint(cx,cy,2);
+      }catch(e){ alert('検索した地名の位置を解決できませんでした'); }
+    });
+
+    // basic zoom/pan using viewBox manipulation
+    let vb = svg.viewBox.baseVal;
+    if(!vb || vb.width === 0){
+      // set viewBox from bbox
+      const b = svg.getBBox(); svg.setAttribute('viewBox', [b.x,b.y,b.width,b.height].join(' ')); vb = svg.viewBox.baseVal;
+    }
+    let current = {x:vb.x, y:vb.y, w:vb.width, h:vb.height};
+
+    function setView(v){ svg.setAttribute('viewBox', [v.x, v.y, v.w, v.h].join(' ')); }
+    function zoomToPoint(cx,cy,scale){ // scale >1 zoom in
+      const w = current.w / scale, h = current.h / scale;
+      const x = cx - w/2, y = cy - h/2;
+      current={x,y,w,h}; setView(current);
+    }
+
+    // drag to pan
+    let dragging=false, last=null;
+    holder.addEventListener('mousedown', (e)=>{ dragging=true; last = {x:e.clientX, y:e.clientY}; holder.style.cursor='grabbing'; });
+    window.addEventListener('mouseup', ()=>{ dragging=false; holder.style.cursor='default'; last=null; });
+    holder.addEventListener('mousemove', (e)=>{
+      if(!dragging || !last) return;
+      const dx = (e.clientX - last.x) * (current.w / holder.clientWidth);
+      const dy = (e.clientY - last.y) * (current.h / holder.clientHeight);
+      current.x -= dx; current.y -= dy; setView(current); last={x:e.clientX,y:e.clientY};
+    });
+
+    // wheel to zoom
+    holder.addEventListener('wheel', e=>{
+      e.preventDefault(); const delta = e.deltaY > 0 ? 0.9 : 1.1; const mx = e.offsetX, my = e.offsetY;
+      // convert mouse to svg coords
+      const svgRect = holder.getBoundingClientRect();
+      const px = (mx / svgRect.width) * current.w + current.x;
+      const py = (my / svgRect.height) * current.h + current.y;
+      const newW = current.w / delta, newH = current.h / delta;
+      current = { x: px - (mx/svgRect.width)*newW, y: py - (my/svgRect.height)*newH, w:newW, h:newH };
+      setView(current);
+    }, {passive:false});
+
+    // helper normalize color (attempt to convert rgb(...) to hex)
+    function normalizeColor(c){
+      if(!c) return null;
+      c = c.trim();
+      if(c.startsWith('rgb')){
+        const nums = c.replace(/[rgba()]/g,'').split(',').map(s=>parseFloat(s.trim()));
+        const r = nums[0]|0, g=nums[1]|0, b=nums[2]|0;
+        return '#'+((1<<24) + (r<<16) + (g<<8) + b).toString(16).slice(1);
+      }
+      if(c === 'none') return null;
+      return c;
+    }
+
+  }catch(err){
+    infoBody.innerHTML = 'エラー: ' + err.message;
+    console.error(err);
+  }
+})();
+</script>
+</body>
+</html>
