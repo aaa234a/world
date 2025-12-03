@@ -277,6 +277,7 @@ const constants = {
   PEACE_COST_OIL_PER_10: 1,
   PEACE_COST_IRON_PER_10: 1,
   PEACE_COST_TERRITORY: 100,
+  BASE_POPULATION_GROWTH_PER_TERRITORY: 50, // 1分あたり、1領土あたりで増える基本人口
 };
 
 const NATIONAL_FOCUSES = {
@@ -673,12 +674,18 @@ app.get("/api/user/ip", (req, res) => {
 
 // ヘルパー関数: 国情報をIPで取得
 async function getNationInfoByIp(ip) {
-  return Nation.findOne({ owner: ip });
+  // 必要最低限のフィールドのみ取得するように修正
+  return Nation.findOne({ owner: ip }).select(
+    "name owner originalId color infantry tank mechanizedInfantry bomber money population territories missile oil iron activeFocusId focusTurnsRemaining completedFocuses acquiredTitles selectedTitleId flagUrl invasionStatus nuclearMissile artillery railways shinkansen airports tourismFacilities flights"
+  );
 }
 
 // ヘルパー関数: 国情報を国名で取得
 async function getNationInfoByName(nationName) {
-  return Nation.findOne({ name: nationName });
+  // 必要最低限のフィールドのみ取得するように修正
+  return Nation.findOne({ name: nationName }).select(
+    "name owner originalId color infantry tank mechanizedInfantry bomber money population territories missile oil iron activeFocusId focusTurnsRemaining completedFocuses acquiredTitles selectedTitleId flagUrl invasionStatus nuclearMissile artillery railways shinkansen airports tourismFacilities flights"
+  );
 }
 
 // ヘルパー関数: ユーザーのアクティビティを更新
@@ -700,13 +707,16 @@ async function updateUserActivity(userIp, nationName = "未登録の国") {
 // 滅亡国の処理
 async function removeNationsWithoutTerritories() {
   try {
+    // 必要なフィールドをselectし、lean()を使用
     const nationsToDelete = await Nation.find({
       $or: [{ territories: { $size: 0 } }, { population: { $lte: 0 } }],
-    });
+    })
+      .select("name owner")
+      .lean();
 
     for (const nation of nationsToDelete) {
       await addNews(`${nation.name}は滅亡しました。`);
-      await Nation.deleteOne({ _id: nation._id });
+      await Nation.deleteOne({ owner: nation.owner }); // _idではなくownerを使用
       await Alliance.deleteMany({
         $or: [{ requesterIp: nation.owner }, { approverIp: nation.owner }],
       });
@@ -734,11 +744,18 @@ async function removeNationsWithoutTerritories() {
 // GET /api/nations
 app.get("/api/nations", async (req, res) => {
   try {
+    // クライアントで必要な最小限のフィールドをselectし、lean()を使用
     const nations = await Nation.find({
       territories: { $exists: true, $ne: [] },
-    });
+    })
+      .select(
+        "originalId name color infantry tank mechanizedInfantry bomber money population territories owner missile oil iron activeFocusId focusTurnsRemaining completedFocuses acquiredTitles selectedTitleId flagUrl invasionStatus nuclearMissile artillery railways shinkansen airports tourismFacilities flights -_id -__v"
+      ) // _idと__vを除外
+      .lean();
+
+    // originalIdは保持しているので、id: n.originalId をそのまま利用
     const formattedNations = nations.map((n) => ({
-      id: n.originalId,
+      id: n.originalId, // originalIdをidとして返す
       name: n.name,
       color: n.color,
       infantry: n.infantry,
@@ -767,7 +784,11 @@ app.get("/api/nations", async (req, res) => {
       tourismFacilities: n.tourismFacilities,
       flights: n.flights,
     }));
-    const myNation = await Nation.findOne({ owner: req.userIp }); // req.userIpで再取得
+
+    // myNationのselectも最適化
+    const myNation = await Nation.findOne({ owner: req.userIp })
+      .select("name")
+      .lean();
     await updateUserActivity(
       req.userIp,
       myNation ? myNation.name : "未登録の国"
@@ -801,17 +822,18 @@ app.post("/api/registerNation", async (req, res) => {
       .json({ success: false, message: "領土名が不正です。" });
 
   try {
-    if (await Nation.findOne({ owner: userIp }))
+    // 既存チェックもselectで軽量化
+    if (await Nation.findOne({ owner: userIp }).select("_id").lean())
       return res.status(409).json({
         success: false,
         message: "あなたはすでに国を持っているため登録できません。",
       });
-    if (await Nation.findOne({ territories: countryName }))
+    if (await Nation.findOne({ territories: countryName }).select("_id").lean())
       return res.status(409).json({
         success: false,
         message: "その領土はすでに所有されています。",
       });
-    if (await Nation.findOne({ name: nationName }))
+    if (await Nation.findOne({ name: nationName }).select("_id").lean())
       return res.status(409).json({
         success: false,
         message: "その国名はすでに使用されています。",
@@ -874,7 +896,10 @@ app.post("/api/buyTerritory", async (req, res) => {
       .json({ success: false, message: "領土名が不正です。" });
 
   try {
-    const userNation = await Nation.findOne({ owner: userIp });
+    // 必要なフィールドをselectし、lean()を使用
+    const userNation = await Nation.findOne({ owner: userIp })
+      .select("money territories name")
+      .lean();
     if (!userNation)
       return res
         .status(404)
@@ -889,7 +914,7 @@ app.post("/api/buyTerritory", async (req, res) => {
         success: false,
         message: `お金が足りません。(必要: ${calculatedPurchasePrice}円)`,
       });
-    if (await Nation.findOne({ territories: countryName }))
+    if (await Nation.findOne({ territories: countryName }).select("_id").lean())
       return res.status(409).json({
         success: false,
         message: "その領土はすでに所有されています。",
@@ -902,7 +927,9 @@ app.post("/api/buyTerritory", async (req, res) => {
         $push: { territories: countryName },
       },
       { new: true }
-    );
+    )
+      .select("money") // 更新後のmoneyだけが必要なため
+      .lean();
 
     await addNews(`${userNation.name} が ${countryName} を購入しました`);
     res.json({
@@ -936,7 +963,12 @@ app.post("/api/reinforceArmy", async (req, res) => {
   }
 
   try {
-    const userNation = await Nation.findOne({ owner: userIp });
+    // 必要なフィールドをselectし、lean()を使用
+    const userNation = await Nation.findOne({ owner: userIp })
+      .select(
+        "name money oil iron completedFocuses infantry tank mechanizedInfantry bomber missile nuclearMissile artillery"
+      )
+      .lean();
     if (!userNation)
       return res
         .status(404)
@@ -1061,7 +1093,9 @@ app.post("/api/reinforceArmy", async (req, res) => {
       { owner: userIp },
       updateData,
       { new: true }
-    );
+    )
+      .select("money oil iron") // 返却に必要なフィールドのみ
+      .lean();
 
     await addNews(
       `${userNation.name} が ${type} を ${parsedAmount} 個増強しました。`
@@ -1096,7 +1130,10 @@ app.post("/api/buildInfrastructure", async (req, res) => {
   }
 
   try {
-    const userNation = await Nation.findOne({ owner: userIp });
+    // 必要なフィールドをselectし、lean()を使用
+    const userNation = await Nation.findOne({ owner: userIp })
+      .select("name money oil iron")
+      .lean();
     if (!userNation)
       return res
         .status(404)
@@ -1176,7 +1213,9 @@ app.post("/api/buildInfrastructure", async (req, res) => {
       { owner: userIp },
       updateData,
       { new: true }
-    );
+    )
+      .select("money oil iron") // 返却に必要なフィールドのみ
+      .lean();
 
     await addNews(
       `${userNation.name} が ${infrastructureName} を ${parsedAmount} 個建設しました。`
@@ -1206,7 +1245,7 @@ app.get("/api/getPendingFlightRequests", async (req, res) => {
     const pendingRequests = await FlightRequest.find({
       approverIp: userIp,
       status: "Pending",
-    });
+    }).lean(); // lean()を追加
     res.json(pendingRequests);
   } catch (error) {
     console.error("getPendingFlightRequests エラー:", error);
@@ -1226,12 +1265,14 @@ app.get("/api/getEstablishedFlights", async (req, res) => {
       .json({ success: false, message: "IPアドレスが取得できません。" });
 
   try {
-    const userNation = await Nation.findOne({ owner: userIp }).select(
-      "flights"
-    );
+    // flightsのみ取得し、lean()を使用
+    const userNation = await Nation.findOne({ owner: userIp })
+      .select("flights")
+      .lean();
     if (!userNation) return res.json([]);
 
-    const allNations = await Nation.find({}).select("owner name");
+    // ownerとnameのみ取得し、lean()を使用
+    const allNations = await Nation.find({}).select("owner name").lean();
     const validFlights = userNation.flights.filter((flight) => {
       const targetNation = allNations.find((n) => n.owner === flight.targetIp);
       return flight.status === "approved" && targetNation;
@@ -1271,12 +1312,17 @@ app.post("/api/requestFlight", async (req, res) => {
     });
 
   try {
-    const requesterNation = await Nation.findOne({ owner: userIp });
+    // 必要なフィールドをselectし、lean()を使用
+    const requesterNation = await Nation.findOne({ owner: userIp })
+      .select("owner name airports")
+      .lean();
     if (!requesterNation)
       return res
         .status(404)
         .json({ success: false, message: "あなたの国が見つかりません。" });
-    const approverNation = await Nation.findOne({ name: targetNationName });
+    const approverNation = await Nation.findOne({ name: targetNationName })
+      .select("owner name airports")
+      .lean();
     if (!approverNation)
       return res.status(404).json({
         success: false,
@@ -1299,6 +1345,7 @@ app.post("/api/requestFlight", async (req, res) => {
         message: "相手国に空港が建設されていません。",
       });
 
+    // lean()を使用
     const existingFlight = await FlightRequest.findOne({
       $or: [
         {
@@ -1311,7 +1358,7 @@ app.post("/api/requestFlight", async (req, res) => {
         },
       ],
       status: { $in: ["Pending", "Approved"] },
-    });
+    }).lean();
     if (existingFlight) {
       if (existingFlight.status === "Approved")
         return res.status(409).json({
@@ -1367,11 +1414,12 @@ app.post("/api/respondToFlightRequest", async (req, res) => {
       .json({ success: false, message: "不正なリクエストです。" });
 
   try {
+    // lean()を使用
     const flightRequest = await FlightRequest.findOne({
       requesterIp,
       approverIp: userIp,
       status: "Pending",
-    });
+    }).lean();
     if (!flightRequest)
       return res.status(404).json({
         success: false,
@@ -1444,7 +1492,6 @@ app.post("/api/attackTerritory", async (req, res) => {
     return res
       .status(401)
       .json({ success: false, message: "IPアドレスが取得できません。" });
-  // 入力バリデーションは省略しますが、必ずサーバーサイドで行ってください (client.js側に記述はあり)
   const validAmount = (val) => !(isNaN(val) || val < 0 || val > 10000000);
   if (
     !validAmount(attackInfantry) ||
@@ -1458,7 +1505,12 @@ app.post("/api/attackTerritory", async (req, res) => {
   }
 
   try {
-    let attackerNation = await Nation.findOne({ owner: userIp });
+    // 必要なフィールドをselectし、lean()を使用
+    let attackerNation = await Nation.findOne({ owner: userIp })
+      .select(
+        "name invasionStatus infantry tank mechanizedInfantry artillery completedFocuses"
+      )
+      .lean();
     if (!attackerNation)
       return res
         .status(404)
@@ -1501,12 +1553,17 @@ app.post("/api/attackTerritory", async (req, res) => {
         },
       }
     );
-    // DBから最新のattackerNation情報を再取得 (消費後の状態)
-    attackerNation = await Nation.findOne({ owner: userIp });
+    // DBから最新のattackerNation情報を再取得 (消費後の状態)。ここでは更新されたデータは不要、元データがあれば十分
+    // attackerNation = await Nation.findOne({ owner: userIp }).select('name invasionStatus infantry tank mechanizedInfantry artillery completedFocuses').lean();
 
+    // 必要なフィールドをselectし、lean()を使用
     const defenderNation = await Nation.findOne({
       territories: targetCountryName,
-    });
+    })
+      .select(
+        "owner name territories infantry tank mechanizedInfantry artillery completedFocuses"
+      )
+      .lean();
     if (!defenderNation) {
       await Nation.updateOne(
         { owner: userIp },
@@ -1529,13 +1586,14 @@ app.post("/api/attackTerritory", async (req, res) => {
     }
 
     // 戦争宣言ロジック
+    // lean()を使用
     let war = await War.findOne({
       $or: [
         { attackerIp: userIp, defenderIp: defenderNation.owner },
         { attackerIp: defenderNation.owner, defenderIp: userIp },
       ],
       status: { $nin: ["Ended", "Cancelled"] },
-    });
+    }).lean();
 
     if (!war) {
       const allTerritoriesData = await Nation.find({})
@@ -1567,13 +1625,16 @@ app.post("/api/attackTerritory", async (req, res) => {
       `${attackerNation.name} が ${defenderNation.name} の ${targetCountryName} への侵略を開始しました。30秒間、侵略中となります。`
     );
 
-    // 非同期待機: サーバーをブロックしないように Promise と setTimeout を使用
-    await new Promise((resolve) => setTimeout(resolve, 10 * 1000)); // 10秒待機 (テスト用に短縮)
+    await new Promise((resolve) => setTimeout(resolve, 10 * 1000));
 
-    // 待機後、最新の防衛側情報を取得
+    // 待機後、最新の防衛側情報を取得 (必要なフィールドをselectし、lean()を使用)
     let updatedDefenderNation = await Nation.findOne({
       owner: defenderNation.owner,
-    });
+    })
+      .select(
+        "territories infantry tank mechanizedInfantry artillery completedFocuses"
+      )
+      .lean();
     if (!updatedDefenderNation) {
       await Nation.updateOne(
         { owner: userIp },
@@ -1699,7 +1760,6 @@ app.post("/api/attackTerritory", async (req, res) => {
       );
     }
 
-    // 実際の損失計算
     const actualAttackerInfLoss = Math.floor(attackInfantry * attackerLossRate);
     const actualAttackerTankLoss = Math.floor(attackTank * attackerLossRate);
     const actualAttackerMechInfLoss = Math.floor(
@@ -1722,7 +1782,6 @@ app.post("/api/attackTerritory", async (req, res) => {
       defensePerTerritoryArtillery * defenderLossRate
     );
 
-    // 防衛側の部隊を更新
     await Nation.updateOne(
       { owner: updatedDefenderNation.owner },
       {
@@ -1735,7 +1794,6 @@ app.post("/api/attackTerritory", async (req, res) => {
       }
     );
 
-    // --- 戦勝点計算 ---
     let attackerWarScoreChange = 0;
     let defenderWarScoreChange = 0;
 
@@ -1788,7 +1846,7 @@ app.post("/api/attackTerritory", async (req, res) => {
 
     await War.updateOne({ warId: war.warId }, scoreUpdate);
 
-    await removeNationsWithoutTerritories(); // 滅亡国のチェック
+    await removeNationsWithoutTerritories();
 
     res.json({
       success: true,
@@ -1829,7 +1887,10 @@ app.post("/api/bombardTerritory", async (req, res) => {
     });
 
   try {
-    let attackerNation = await Nation.findOne({ owner: userIp });
+    // 必要なフィールドをselectし、lean()を使用
+    let attackerNation = await Nation.findOne({ owner: userIp })
+      .select("name invasionStatus bomber")
+      .lean();
     if (!attackerNation)
       return res
         .status(404)
@@ -1845,9 +1906,14 @@ app.post("/api/bombardTerritory", async (req, res) => {
       { $set: { invasionStatus: "in_progress" } }
     );
 
+    // 必要なフィールドをselectし、lean()を使用
     let defenderNation = await Nation.findOne({
       territories: targetCountryName,
-    });
+    })
+      .select(
+        "owner name territories infantry tank mechanizedInfantry artillery"
+      )
+      .lean();
     if (!defenderNation) {
       await Nation.updateOne(
         { owner: userIp },
@@ -1879,13 +1945,14 @@ app.post("/api/bombardTerritory", async (req, res) => {
     }
 
     // 戦争宣言ロジック
+    // lean()を使用
     let war = await War.findOne({
       $or: [
         { attackerIp: userIp, defenderIp: defenderNation.owner },
         { attackerIp: defenderNation.owner, defenderIp: userIp },
       ],
       status: { $nin: ["Ended", "Cancelled"] },
-    });
+    }).lean();
 
     if (!war) {
       const allTerritoriesData = await Nation.find({})
@@ -1996,7 +2063,6 @@ app.post("/api/bombardTerritory", async (req, res) => {
     warPointsGained += artilleryLoss * constants.WAR_POINT_ARTILLERY;
     warPointsGained += numberOfBombers * constants.WAR_POINT_BOMBER;
 
-    // War スコアを更新
     const scoreUpdate = {};
     if (war.attackerIp === userIp) {
       scoreUpdate.$inc = { attackerWarScore: warPointsGained };
@@ -2044,12 +2110,17 @@ app.post("/api/transferResourcesByName", async (req, res) => {
       .json({ success: false, message: "正しい数量を入力してください。" });
 
   try {
-    const senderNation = await Nation.findOne({ owner: userIp });
+    // 必要なフィールドをselectし、lean()を使用
+    const senderNation = await Nation.findOne({ owner: userIp })
+      .select(`name ${type}`)
+      .lean();
     if (!senderNation)
       return res
         .status(404)
         .json({ success: false, message: "自国が見つかりません。" });
-    const receiverNation = await Nation.findOne({ name: toNationName });
+    const receiverNation = await Nation.findOne({ name: toNationName })
+      .select("owner")
+      .lean();
     if (!receiverNation)
       return res
         .status(404)
@@ -2159,12 +2230,18 @@ app.post("/api/spyNation", async (req, res) => {
     });
 
   try {
-    const senderNation = await Nation.findOne({ owner: userIp });
+    // 必要なフィールドをselectし、lean()を使用
+    const senderNation = await Nation.findOne({ owner: userIp })
+      .select("name money")
+      .lean();
     if (!senderNation)
       return res
         .status(404)
         .json({ success: false, message: "あなたの国が見つかりません。" });
-    const targetNation = await Nation.findOne({ name: targetNationName });
+    // 全フィールドが必要なので、ここでは特にselectしないが、lean()でオーバーヘッドを減らす
+    const targetNation = await Nation.findOne({
+      name: targetNationName,
+    }).lean();
     if (!targetNation)
       return res
         .status(404)
@@ -2192,7 +2269,6 @@ app.post("/api/spyNation", async (req, res) => {
       });
     }
 
-    // 成功
     const getRangeApproximate = (value, rate = 0.2) => {
       const numValue = parseInt(value, 10);
       if (isNaN(numValue)) return "不明";
@@ -2248,12 +2324,20 @@ app.post("/api/sabotageNation", async (req, res) => {
     });
 
   try {
-    const senderNation = await Nation.findOne({ owner: userIp });
+    // 必要なフィールドをselectし、lean()を使用
+    const senderNation = await Nation.findOne({ owner: userIp })
+      .select("name money")
+      .lean();
     if (!senderNation)
       return res
         .status(404)
         .json({ success: false, message: "あなたの国が見つかりません。" });
-    const targetNation = await Nation.findOne({ name: targetNationName });
+    // 全フィールドが必要なので、ここでは特にselectしないが、lean()でオーバーヘッドを減らす
+    const targetNation = await Nation.findOne({ name: targetNationName })
+      .select(
+        "name money population infantry tank mechanizedInfantry bomber missile nuclearMissile artillery oil iron"
+      )
+      .lean();
     if (!targetNation)
       return res
         .status(404)
@@ -2270,7 +2354,6 @@ app.post("/api/sabotageNation", async (req, res) => {
         message: `お金が足りません。(必要: ${constants.SABOTAGE_COST}円)`,
       });
 
-    // コストを差し引く
     await Nation.updateOne(
       { owner: userIp },
       { $inc: { money: -constants.SABOTAGE_COST } }
@@ -2278,7 +2361,6 @@ app.post("/api/sabotageNation", async (req, res) => {
 
     let message = "";
     if (Math.random() < constants.SABOTAGE_SUCCESS_CHANCE) {
-      // 成功
       const destructionTypes = ["units", "money", "resources", "population"];
       const chosenType =
         destructionTypes[Math.floor(Math.random() * destructionTypes.length)];
@@ -2384,7 +2466,6 @@ app.post("/api/sabotageNation", async (req, res) => {
         message: `破壊工作成功！ ${destructionDetails}`,
       });
     } else {
-      // 失敗
       const failureCost =
         constants.SABOTAGE_FAILURE_COST - constants.SABOTAGE_COST;
       const updatedMoney = Math.max(
@@ -2428,12 +2509,17 @@ app.post("/api/transferTerritory", async (req, res) => {
       .json({ success: false, message: "領土名または相手国名が不正です。" });
 
   try {
-    const senderNation = await Nation.findOne({ owner: userIp });
+    // 必要なフィールドをselectし、lean()を使用
+    const senderNation = await Nation.findOne({ owner: userIp })
+      .select("name owner territories")
+      .lean();
     if (!senderNation)
       return res
         .status(404)
         .json({ success: false, message: "自国が見つかりません。" });
-    const receiverNation = await Nation.findOne({ name: targetNationName });
+    const receiverNation = await Nation.findOne({ name: targetNationName })
+      .select("owner name")
+      .lean();
     if (!receiverNation)
       return res
         .status(404)
@@ -2510,7 +2596,10 @@ app.post("/api/launchMissile", async (req, res) => {
     });
 
   try {
-    let attackerNation = await Nation.findOne({ owner: userIp });
+    // 必要なフィールドをselectし、lean()を使用
+    let attackerNation = await Nation.findOne({ owner: userIp })
+      .select("name invasionStatus missile")
+      .lean();
     if (!attackerNation)
       return res
         .status(404)
@@ -2526,9 +2615,14 @@ app.post("/api/launchMissile", async (req, res) => {
       { $set: { invasionStatus: "in_progress" } }
     );
 
+    // 必要なフィールドをselectし、lean()を使用
     let defenderNation = await Nation.findOne({
       territories: targetCountryName,
-    });
+    })
+      .select(
+        "owner name territories infantry tank mechanizedInfantry artillery population"
+      )
+      .lean();
     if (!defenderNation) {
       await Nation.updateOne(
         { owner: userIp },
@@ -2561,13 +2655,14 @@ app.post("/api/launchMissile", async (req, res) => {
     }
 
     // 戦争宣言ロジック (存在しない場合)
+    // lean()を使用
     let war = await War.findOne({
       $or: [
         { attackerIp: userIp, defenderIp: defenderNation.owner },
         { attackerIp: defenderNation.owner, defenderIp: userIp },
       ],
       status: { $nin: ["Ended", "Cancelled"] },
-    });
+    }).lean();
 
     if (!war) {
       const allTerritoriesData = await Nation.find({})
@@ -2706,7 +2801,10 @@ app.post("/api/launchNuclearMissile", async (req, res) => {
     });
 
   try {
-    let attackerNation = await Nation.findOne({ owner: userIp });
+    // 必要なフィールドをselectし、lean()を使用
+    let attackerNation = await Nation.findOne({ owner: userIp })
+      .select("name invasionStatus nuclearMissile completedFocuses")
+      .lean();
     if (!attackerNation)
       return res
         .status(404)
@@ -2731,9 +2829,14 @@ app.post("/api/launchNuclearMissile", async (req, res) => {
       { $set: { invasionStatus: "in_progress" } }
     );
 
+    // 必要なフィールドをselectし、lean()を使用
     let defenderNation = await Nation.findOne({
       territories: targetCountryName,
-    });
+    })
+      .select(
+        "owner name population infantry tank mechanizedInfantry bomber missile artillery"
+      )
+      .lean();
     if (!defenderNation) {
       await Nation.updateOne(
         { owner: userIp },
@@ -2766,13 +2869,14 @@ app.post("/api/launchNuclearMissile", async (req, res) => {
     }
 
     // 戦争宣言ロジック (存在しない場合)
+    // lean()を使用
     let war = await War.findOne({
       $or: [
         { attackerIp: userIp, defenderIp: defenderNation.owner },
         { attackerIp: defenderNation.owner, defenderIp: userIp },
       ],
       status: { $nin: ["Ended", "Cancelled"] },
-    });
+    }).lean();
 
     if (!war) {
       const allTerritoriesData = await Nation.find({})
@@ -2893,7 +2997,10 @@ app.post("/api/launchNuclearMissile", async (req, res) => {
 // GET /api/chatMessages
 app.get("/api/chatMessages", async (req, res) => {
   try {
-    const messages = await ChatLog.find({}).sort({ timestamp: -1 }).limit(30);
+    const messages = await ChatLog.find({})
+      .sort({ timestamp: -1 })
+      .limit(30)
+      .lean(); // lean()を追加
     const formattedMessages = messages.reverse().map((msg) => ({
       time: format(msg.timestamp, "HH:mm"),
       userIp: msg.userIp,
@@ -2935,7 +3042,10 @@ app.post("/api/postChatMessage", async (req, res) => {
   }
 
   try {
-    const userNation = await Nation.findOne({ owner: userIp });
+    // 必要なフィールドをselectし、lean()を使用
+    const userNation = await Nation.findOne({ owner: userIp })
+      .select("name selectedTitleId flagUrl")
+      .lean();
     const nationName = userNation ? userNation.name : "不明な国";
     const selectedTitleId = userNation ? userNation.selectedTitleId : "";
     const flagUrl = userNation ? userNation.flagUrl : "";
@@ -2970,9 +3080,11 @@ app.get("/api/getAvailableNationalFocuses", async (req, res) => {
   }
 
   try {
-    const userNation = await Nation.findOne({ owner: userIp });
+    // 必要なフィールドをselectし、lean()を使用
+    const userNation = await Nation.findOne({ owner: userIp })
+      .select("activeFocusId focusTurnsRemaining completedFocuses")
+      .lean();
 
-    // ★ 国が見つからなくてもエラーにしない
     if (!userNation) {
       return res.json({
         success: true,
@@ -2982,7 +3094,6 @@ app.get("/api/getAvailableNationalFocuses", async (req, res) => {
       });
     }
 
-    // 実行中の国家方針がある場合
     if (userNation.activeFocusId) {
       const activeFocus = NATIONAL_FOCUSES[userNation.activeFocusId];
       return res.json({
@@ -2996,7 +3107,6 @@ app.get("/api/getAvailableNationalFocuses", async (req, res) => {
       });
     }
 
-    // 利用可能な国家方針を計算
     const availableFocuses = [];
     for (const id in NATIONAL_FOCUSES) {
       const focus = NATIONAL_FOCUSES[id];
@@ -3023,8 +3133,6 @@ app.get("/api/getAvailableNationalFocuses", async (req, res) => {
     });
   } catch (error) {
     console.error("getAvailableNationalFocuses エラー:", error);
-
-    // ここも500にせず安全に成功返しにしてもOK（必要なら）
     res.status(500).json({
       success: false,
       message: "利用可能な国家方針の取得中にエラーが発生しました。",
@@ -3050,7 +3158,10 @@ app.post("/api/startNationalFocus", async (req, res) => {
       .json({ success: false, message: "無効な国家方針です。" });
 
   try {
-    const userNation = await Nation.findOne({ owner: userIp });
+    // 必要なフィールドをselectし、lean()を使用
+    const userNation = await Nation.findOne({ owner: userIp })
+      .select("name activeFocusId completedFocuses")
+      .lean();
     if (!userNation)
       return res
         .status(404)
@@ -3111,7 +3222,10 @@ app.post("/api/resetNationalFocus", async (req, res) => {
       .json({ success: false, message: "IPアドレスが取得できません。" });
 
   try {
-    const userNation = await Nation.findOne({ owner: userIp });
+    // 必要なフィールドをselectし、lean()を使用
+    const userNation = await Nation.findOne({ owner: userIp })
+      .select("name")
+      .lean();
     if (!userNation)
       return res
         .status(404)
@@ -3144,7 +3258,10 @@ app.post("/api/resetNationalFocus", async (req, res) => {
 // GET /api/getTerritoryRanking
 app.get("/api/getTerritoryRanking", async (req, res) => {
   try {
-    const nations = await Nation.find({});
+    // 必要なフィールドをselectし、lean()を使用
+    const nations = await Nation.find({})
+      .select("name territories selectedTitleId flagUrl")
+      .lean();
     const ranking = nations.map((n) => ({
       name: n.name,
       territories: n.territories.length,
@@ -3173,7 +3290,10 @@ app.post("/api/updateNationInfo", async (req, res) => {
       .json({ success: false, message: "IPアドレスが取得できません。" });
 
   try {
-    const userNation = await Nation.findOne({ owner: userIp });
+    // 必要なフィールドをselectし、lean()を使用
+    const userNation = await Nation.findOne({ owner: userIp })
+      .select("name color flagUrl")
+      .lean();
     if (!userNation)
       return res
         .status(404)
@@ -3184,7 +3304,7 @@ app.post("/api/updateNationInfo", async (req, res) => {
     const updateFields = {};
 
     if (newName && newName.trim() !== userNation.name) {
-      if (await Nation.findOne({ name: newName.trim() }))
+      if (await Nation.findOne({ name: newName.trim() }).select("_id").lean())
         return res.status(409).json({
           success: false,
           message: `国名「${newName.trim()}」はすでに使用されています。`,
@@ -3213,14 +3333,17 @@ app.post("/api/updateNationInfo", async (req, res) => {
 
     if (updatePerformed) {
       await Nation.updateOne({ owner: userIp }, { $set: updateFields });
-      await ChatLog.updateMany(
-        { userIp },
-        { $set: { nationName: updateFields.name || userNation.name } }
-      ); // チャットログの国名も更新
-      await UserActivity.updateOne(
-        { userIp },
-        { $set: { nationName: updateFields.name || userNation.name } }
-      ); // アクティビティログの国名も更新
+      // nameが更新された場合、chatLogとUserActivityも更新
+      if (updateFields.name) {
+        await ChatLog.updateMany(
+          { userIp },
+          { $set: { nationName: updateFields.name } }
+        );
+        await UserActivity.updateOne(
+          { userIp },
+          { $set: { nationName: updateFields.name } }
+        );
+      }
 
       res.json({ success: true, message: message.join(" ") });
     } else {
@@ -3244,7 +3367,6 @@ app.post("/api/updateNationFlag", async (req, res) => {
     return res
       .status(401)
       .json({ success: false, message: "IPアドレスが取得できません。" });
-  // URLまたはBase64の簡単なバリデーション
   if (
     newFlagUrl &&
     !/^https?:\/\/.+\.(png|jpg|jpeg|gif|svg)$/i.test(newFlagUrl) &&
@@ -3258,7 +3380,10 @@ app.post("/api/updateNationFlag", async (req, res) => {
   }
 
   try {
-    const userNation = await Nation.findOne({ owner: userIp });
+    // 必要なフィールドをselectし、lean()を使用
+    const userNation = await Nation.findOne({ owner: userIp })
+      .select("name")
+      .lean();
     if (!userNation)
       return res
         .status(404)
@@ -3268,7 +3393,7 @@ app.post("/api/updateNationFlag", async (req, res) => {
       { owner: userIp },
       { $set: { flagUrl: newFlagUrl } }
     );
-    await ChatLog.updateMany({ userIp }, { $set: { flagUrl: newFlagUrl } }); // チャットログの国旗も更新
+    await ChatLog.updateMany({ userIp }, { $set: { flagUrl: newFlagUrl } });
 
     await addNews(`${userNation.name} が国旗を変更しました。`);
     res.json({ success: true, message: `国旗を更新しました。` });
@@ -3297,7 +3422,10 @@ app.post("/api/attemptRebellion", async (req, res) => {
     });
 
   try {
-    const userNation = await Nation.findOne({ owner: userIp });
+    // 必要なフィールドをselectし、lean()を使用
+    const userNation = await Nation.findOne({ owner: userIp })
+      .select("territories")
+      .lean();
     if (userNation && userNation.territories.length > 0)
       return res.status(403).json({
         success: false,
@@ -3305,7 +3433,10 @@ app.post("/api/attemptRebellion", async (req, res) => {
           "あなたはすでに国を所有しています。反乱を起こすことはできません。",
       });
 
-    let userActivity = await UserActivity.findOne({ userIp });
+    // lean()を使用
+    let userActivity = await UserActivity.findOne({ userIp })
+      .select("rebellionCount")
+      .lean();
     let rebellionCount = userActivity ? userActivity.rebellionCount : 0;
     if (rebellionCount >= constants.MAX_REBELLIONS)
       return res.status(403).json({
@@ -3313,9 +3444,14 @@ app.post("/api/attemptRebellion", async (req, res) => {
         message: `反乱は${constants.MAX_REBELLIONS}回までしか起こせません。あなたはすでに${rebellionCount}回反乱を起こしています。`,
       });
 
+    // 必要なフィールドをselectし、lean()を使用
     const targetNation = await Nation.findOne({
       territories: targetCountryName,
-    });
+    })
+      .select(
+        "name owner territories money oil iron infantry tank mechanizedInfantry bomber missile nuclearMissile artillery population"
+      )
+      .lean();
     if (!targetNation)
       return res.status(404).json({
         success: false,
@@ -3334,24 +3470,49 @@ app.post("/api/attemptRebellion", async (req, res) => {
 
     const totalTerritoriesOfTarget = targetNation.territories.length;
     const perTerritoryShareMoney =
-      targetNation.money / totalTerritoriesOfTarget;
-    const perTerritoryShareOil = targetNation.oil / totalTerritoriesOfTarget;
-    const perTerritoryShareIron = targetNation.iron / totalTerritoriesOfTarget;
+      totalTerritoriesOfTarget > 0
+        ? targetNation.money / totalTerritoriesOfTarget
+        : 0;
+    const perTerritoryShareOil =
+      totalTerritoriesOfTarget > 0
+        ? targetNation.oil / totalTerritoriesOfTarget
+        : 0;
+    const perTerritoryShareIron =
+      totalTerritoriesOfTarget > 0
+        ? targetNation.iron / totalTerritoriesOfTarget
+        : 0;
     const perTerritoryShareInfantry =
-      targetNation.infantry / totalTerritoriesOfTarget;
-    const perTerritoryShareTank = targetNation.tank / totalTerritoriesOfTarget;
+      totalTerritoriesOfTarget > 0
+        ? targetNation.infantry / totalTerritoriesOfTarget
+        : 0;
+    const perTerritoryShareTank =
+      totalTerritoriesOfTarget > 0
+        ? targetNation.tank / totalTerritoriesOfTarget
+        : 0;
     const perTerritoryShareMechanizedInfantry =
-      targetNation.mechanizedInfantry / totalTerritoriesOfTarget;
+      totalTerritoriesOfTarget > 0
+        ? targetNation.mechanizedInfantry / totalTerritoriesOfTarget
+        : 0;
     const perTerritoryShareBomber =
-      targetNation.bomber / totalTerritoriesOfTarget;
+      totalTerritoriesOfTarget > 0
+        ? targetNation.bomber / totalTerritoriesOfTarget
+        : 0;
     const perTerritoryShareMissile =
-      targetNation.missile / totalTerritoriesOfTarget;
+      totalTerritoriesOfTarget > 0
+        ? targetNation.missile / totalTerritoriesOfTarget
+        : 0;
     const perTerritoryShareNuclearMissile =
-      targetNation.nuclearMissile / totalTerritoriesOfTarget;
+      totalTerritoriesOfTarget > 0
+        ? targetNation.nuclearMissile / totalTerritoriesOfTarget
+        : 0;
     const perTerritoryShareArtillery =
-      targetNation.artillery / totalTerritoriesOfTarget;
+      totalTerritoriesOfTarget > 0
+        ? targetNation.artillery / totalTerritoriesOfTarget
+        : 0;
     const perTerritorySharePopulation =
-      targetNation.population / totalTerritoriesOfTarget;
+      totalTerritoriesOfTarget > 0
+        ? targetNation.population / totalTerritoriesOfTarget
+        : 0;
 
     const initialMoney = Math.floor(
       perTerritoryShareMoney * constants.REBELLION_RESOURCE_FACTOR
@@ -3487,12 +3648,17 @@ app.post("/api/declareWar", async (req, res) => {
     });
 
   try {
-    const attackerNation = await Nation.findOne({ owner: userIp });
+    // 必要なフィールドをselectし、lean()を使用
+    const attackerNation = await Nation.findOne({ owner: userIp })
+      .select("owner name")
+      .lean();
     if (!attackerNation)
       return res
         .status(404)
         .json({ success: false, message: "あなたの国が見つかりません。" });
-    const defenderNation = await Nation.findOne({ name: targetNationName });
+    const defenderNation = await Nation.findOne({ name: targetNationName })
+      .select("owner name")
+      .lean();
     if (!defenderNation)
       return res
         .status(404)
@@ -3503,6 +3669,7 @@ app.post("/api/declareWar", async (req, res) => {
         message: "自分自身に宣戦布告することはできません。",
       });
 
+    // lean()を使用
     if (
       await War.findOne({
         $or: [
@@ -3511,12 +3678,15 @@ app.post("/api/declareWar", async (req, res) => {
         ],
         status: { $nin: ["Ended", "Cancelled"] },
       })
+        .select("_id")
+        .lean()
     ) {
       return res.status(409).json({
         success: false,
         message: `${defenderNation.name}とはすでに戦争中です。`,
       });
     }
+    // lean()を使用
     if (
       await Alliance.findOne({
         $or: [
@@ -3532,6 +3702,8 @@ app.post("/api/declareWar", async (req, res) => {
           },
         ],
       })
+        .select("_id")
+        .lean()
     ) {
       return res.status(403).json({
         success: false,
@@ -3589,7 +3761,7 @@ app.get("/api/getUserWars", async (req, res) => {
     const allWars = await War.find({
       $or: [{ attackerIp: userIp }, { defenderIp: userIp }],
       status: { $nin: ["Ended", "Cancelled"] },
-    });
+    }).lean(); // lean()を追加
 
     const activeWars = [];
     const ceasefireProposals = [];
@@ -3636,7 +3808,8 @@ app.post("/api/proposeCeasefire", async (req, res) => {
       .json({ success: false, message: "戦争IDが不正です。" });
 
   try {
-    const war = await War.findOne({ warId });
+    // lean()を使用
+    const war = await War.findOne({ warId }).lean();
     if (!war)
       return res
         .status(404)
@@ -3699,7 +3872,8 @@ app.post("/api/acceptCeasefire", async (req, res) => {
       .json({ success: false, message: "戦争IDが不正です。" });
 
   try {
-    const war = await War.findOne({ warId });
+    // lean()を使用
+    const war = await War.findOne({ warId }).lean();
     if (!war)
       return res
         .status(404)
@@ -3768,7 +3942,8 @@ app.post("/api/rejectCeasefire", async (req, res) => {
       .json({ success: false, message: "戦争IDが不正です。" });
 
   try {
-    const war = await War.findOne({ warId });
+    // lean()を使用
+    const war = await War.findOne({ warId }).lean();
     if (!war)
       return res
         .status(404)
@@ -3795,7 +3970,7 @@ app.post("/api/rejectCeasefire", async (req, res) => {
         .status(400)
         .json({ success: false, message: "相手から停戦の提案がありません。" });
 
-    await War.updateOne({ warId }, { $set: { ceasefireProposedBy: "" } }); // 提案をキャンセル
+    await War.updateOne({ warId }, { $set: { ceasefireProposedBy: "" } });
 
     const myNationName = (await getNationInfoByIp(userIp)).name;
     const otherNationName = (await getNationInfoByIp(otherPartyIp)).name;
@@ -3830,7 +4005,8 @@ app.post("/api/proposeWhitePeace", async (req, res) => {
       .json({ success: false, message: "戦争IDが不正です。" });
 
   try {
-    const war = await War.findOne({ warId });
+    // lean()を使用
+    const war = await War.findOne({ warId }).lean();
     if (!war)
       return res
         .status(404)
@@ -3902,7 +4078,8 @@ app.post("/api/acceptWhitePeace", async (req, res) => {
       .json({ success: false, message: "戦争IDが不正です。" });
 
   try {
-    const war = await War.findOne({ warId });
+    // lean()を使用
+    const war = await War.findOne({ warId }).lean();
     if (!war)
       return res
         .status(404)
@@ -3927,19 +4104,19 @@ app.post("/api/acceptWhitePeace", async (req, res) => {
       });
 
     const initialTerritoryOwnership = JSON.parse(war.initialTerritoryOwnership);
-    const allNations = await Nation.find({}).lean(); // 最新の全国家データを取得
-    const nationMap = {}; // ownerIp -> nationObject
+    // territoriesとownerのみ取得し、lean()を使用
+    const allNations = await Nation.find({}).select("territories owner").lean();
+    const nationMap = {};
     allNations.forEach((n) => {
       nationMap[n.owner] = n;
     });
 
     let bulkOps = [];
-    let populationChanges = {}; // {ownerIp: popDelta}
+    let populationChanges = {};
 
     for (const territory in initialTerritoryOwnership) {
       const initialOwnerIp = initialTerritoryOwnership[territory];
 
-      // 現在の領土の所有者を見つける
       let currentOwnerIp = null;
       for (const owner of Object.keys(nationMap)) {
         if (nationMap[owner].territories.includes(territory)) {
@@ -3949,15 +4126,12 @@ app.post("/api/acceptWhitePeace", async (req, res) => {
       }
 
       if (currentOwnerIp && currentOwnerIp !== initialOwnerIp) {
-        // 所有者が変更されている場合、元に戻す
-        // 旧所有者から領土を削除 (currentOwnerIp)
         bulkOps.push({
           updateOne: {
             filter: { owner: currentOwnerIp },
             update: { $pull: { territories: territory } },
           },
         });
-        // 新所有者に領土を追加 (initialOwnerIp)
         bulkOps.push({
           updateOne: {
             filter: { owner: initialOwnerIp },
@@ -3965,8 +4139,7 @@ app.post("/api/acceptWhitePeace", async (req, res) => {
           },
         });
 
-        // 人口移動の計算
-        const popTransfer = 1000; // 領土ごとに1000人移動と仮定
+        const popTransfer = 1000;
         populationChanges[initialOwnerIp] =
           (populationChanges[initialOwnerIp] || 0) + popTransfer;
         populationChanges[currentOwnerIp] =
@@ -3974,7 +4147,6 @@ app.post("/api/acceptWhitePeace", async (req, res) => {
       }
     }
 
-    // 人口変更をbulkOpsに追加
     for (const ownerIp in populationChanges) {
       bulkOps.push({
         updateOne: {
@@ -4029,7 +4201,8 @@ app.post("/api/rejectWhitePeace", async (req, res) => {
       .json({ success: false, message: "戦争IDが不正です。" });
 
   try {
-    const war = await War.findOne({ warId });
+    // lean()を使用
+    const war = await War.findOne({ warId }).lean();
     if (!war)
       return res
         .status(404)
@@ -4056,7 +4229,7 @@ app.post("/api/rejectWhitePeace", async (req, res) => {
     await War.updateOne(
       { warId },
       { $set: { status: "Ongoing", ceasefireProposedBy: "" } }
-    ); // ステータスをOngoingに戻し、提案をクリア
+    );
 
     const myNationName = (await getNationInfoByIp(userIp)).name;
     const otherNationName = (await getNationInfoByIp(otherPartyIp)).name;
@@ -4092,7 +4265,8 @@ app.post("/api/startPeaceConference", async (req, res) => {
       .json({ success: false, message: "戦争IDが不正です。" });
 
   try {
-    const war = await War.findOne({ warId });
+    // lean()を使用
+    const war = await War.findOne({ warId }).lean();
     if (!war)
       return res
         .status(404)
@@ -4152,6 +4326,7 @@ app.post("/api/startPeaceConference", async (req, res) => {
       });
     }
 
+    // lean()を使用 (getNationInfoByIpは既にselectしているのでそのまま)
     const loserNationData = await getNationInfoByIp(loserIp);
     if (!loserNationData) {
       return res
@@ -4219,7 +4394,8 @@ app.post("/api/makePeaceDemands", async (req, res) => {
       .json({ success: false, message: "要求が指定されていません。" });
 
   try {
-    const war = await War.findOne({ warId });
+    // lean()を使用
+    const war = await War.findOne({ warId }).lean();
     if (!war)
       return res
         .status(404)
@@ -4246,7 +4422,7 @@ app.post("/api/makePeaceDemands", async (req, res) => {
       availableWarPoints = myWarScore - opponentWarScore;
     } else if (opponentWarScore > myWarScore) {
       winnerIp = isAttacker ? war.defenderIp : war.attackerIp;
-      loserIp = userIp; // Current user is the loser
+      loserIp = userIp;
       availableWarPoints = opponentWarScore - myWarScore;
     } else {
       return res.status(400).json({
@@ -4284,7 +4460,6 @@ app.post("/api/makePeaceDemands", async (req, res) => {
     const demandedArtillery = parseInt(demands.artillery, 10) || 0;
     const demandedTerritories = demands.territories || [];
 
-    // --- サーバーサイドバリデーション: 要求量が敗戦国の保有量を超えていないか ---
     if (demandedMoney < 0 || demandedMoney > loserNation.money)
       return res.status(400).json({
         success: false,
@@ -4350,7 +4525,6 @@ app.post("/api/makePeaceDemands", async (req, res) => {
         });
     }
 
-    // 戦勝点コスト計算
     totalCost +=
       Math.ceil(demandedMoney / 1000) * constants.PEACE_COST_MONEY_PER_1000;
     totalCost += Math.ceil(demandedOil / 10) * constants.PEACE_COST_OIL_PER_10;
@@ -4372,10 +4546,8 @@ app.post("/api/makePeaceDemands", async (req, res) => {
         message: `戦勝点が足りません。要求総コスト: ${totalCost}, 利用可能戦勝点: ${availableWarPoints}`,
       });
 
-    // 要求の適用
     let bulkOps = [];
 
-    // お金
     if (demandedMoney > 0) {
       bulkOps.push({
         updateOne: {
@@ -4390,7 +4562,6 @@ app.post("/api/makePeaceDemands", async (req, res) => {
         },
       });
     }
-    // 石油
     if (demandedOil > 0) {
       bulkOps.push({
         updateOne: {
@@ -4405,7 +4576,6 @@ app.post("/api/makePeaceDemands", async (req, res) => {
         },
       });
     }
-    // 鉄
     if (demandedIron > 0) {
       bulkOps.push({
         updateOne: {
@@ -4420,7 +4590,6 @@ app.post("/api/makePeaceDemands", async (req, res) => {
         },
       });
     }
-    // 部隊
     if (demandedInfantry > 0) {
       bulkOps.push({
         updateOne: {
@@ -4520,7 +4689,6 @@ app.post("/api/makePeaceDemands", async (req, res) => {
       });
     }
 
-    // 領土譲渡
     let totalPopulationTransfer = 0;
     for (const territory of demandedTerritories) {
       bulkOps.push({
@@ -4535,13 +4703,12 @@ app.post("/api/makePeaceDemands", async (req, res) => {
           update: { $push: { territories: territory } },
         },
       });
-      totalPopulationTransfer += 1000; // 領土移動による人口増減
+      totalPopulationTransfer += 1000;
       await addNews(
         `${winnerNation.name} が ${loserNation.name} から領土 ${territory} を獲得しました。`
       );
     }
 
-    // 領土変更に伴う人口調整もbulkOpsに追加
     if (totalPopulationTransfer > 0) {
       bulkOps.push({
         updateOne: {
@@ -4561,7 +4728,6 @@ app.post("/api/makePeaceDemands", async (req, res) => {
       await Nation.bulkWrite(bulkOps);
     }
 
-    // 戦争を終了
     await War.updateOne({ warId }, { $set: { status: "Ended" } });
 
     await addNews(
@@ -4597,7 +4763,8 @@ app.post("/api/cancelWar", async (req, res) => {
       .json({ success: false, message: "戦争IDが不正です。" });
 
   try {
-    const war = await War.findOne({ warId });
+    // lean()を使用
+    const war = await War.findOne({ warId }).lean();
     if (!war)
       return res
         .status(404)
@@ -4651,12 +4818,17 @@ app.post("/api/requestAlliance", async (req, res) => {
     });
 
   try {
-    const requesterNation = await Nation.findOne({ owner: userIp });
+    // 必要なフィールドをselectし、lean()を使用
+    const requesterNation = await Nation.findOne({ owner: userIp })
+      .select("owner name")
+      .lean();
     if (!requesterNation)
       return res
         .status(404)
         .json({ success: false, message: "あなたの国が見つかりません。" });
-    const approverNation = await Nation.findOne({ name: targetNationName });
+    const approverNation = await Nation.findOne({ name: targetNationName })
+      .select("owner name")
+      .lean();
     if (!approverNation)
       return res
         .status(404)
@@ -4667,6 +4839,7 @@ app.post("/api/requestAlliance", async (req, res) => {
         message: "自分自身と同盟を組むことはできません。",
       });
 
+    // lean()を使用
     const existingAlliance = await Alliance.findOne({
       $or: [
         {
@@ -4679,7 +4852,7 @@ app.post("/api/requestAlliance", async (req, res) => {
         },
       ],
       status: { $in: ["Pending", "Approved"] },
-    });
+    }).lean();
 
     if (existingAlliance) {
       if (existingAlliance.status === "Approved")
@@ -4735,11 +4908,12 @@ app.post("/api/respondToAllianceRequest", async (req, res) => {
       .json({ success: false, message: "不正なリクエストです。" });
 
   try {
+    // lean()を使用
     const allianceRequest = await Alliance.findOne({
       requesterIp,
       approverIp: userIp,
       status: "Pending",
-    });
+    }).lean();
     if (!allianceRequest)
       return res.status(404).json({
         success: false,
@@ -4790,7 +4964,7 @@ app.get("/api/getAlliances", async (req, res) => {
   try {
     const allAlliances = await Alliance.find({
       $or: [{ requesterIp: userIp }, { approverIp: userIp }],
-    });
+    }).lean(); // lean()を追加
 
     const pendingRequests = [];
     const approvedAlliances = [];
@@ -4842,12 +5016,13 @@ app.post("/api/dissolveAlliance", async (req, res) => {
       .json({ success: false, message: "同盟国のIPアドレスが不正です。" });
 
   try {
+    // lean()を使用
     const alliance = await Alliance.findOne({
       $or: [
         { requesterIp: userIp, approverIp: alliedNationIp, status: "Approved" },
         { requesterIp: alliedNationIp, approverIp: userIp, status: "Approved" },
       ],
-    });
+    }).lean();
 
     if (!alliance)
       return res
@@ -4893,11 +5068,11 @@ app.get("/api/getUserTitlesData", async (req, res) => {
   }
 
   try {
-    const userNation = await Nation.findOne({ owner: userIp }).select(
-      "acquiredTitles selectedTitleId"
-    );
+    // 必要なフィールドをselectし、lean()を使用
+    const userNation = await Nation.findOne({ owner: userIp })
+      .select("acquiredTitles selectedTitleId")
+      .lean();
 
-    // 国が見つからなくても error にせず空データ返す
     if (!userNation) {
       return res.json({
         success: true,
@@ -4939,7 +5114,10 @@ app.post("/api/selectDisplayTitle", async (req, res) => {
       .json({ success: false, message: "無効な称号IDです。" });
 
   try {
-    const userNation = await Nation.findOne({ owner: userIp });
+    // 必要なフィールドをselectし、lean()を使用
+    const userNation = await Nation.findOne({ owner: userIp })
+      .select("name acquiredTitles flagUrl")
+      .lean();
     if (!userNation)
       return res
         .status(404)
@@ -4958,7 +5136,6 @@ app.post("/api/selectDisplayTitle", async (req, res) => {
       { owner: userIp },
       { $set: { selectedTitleId: titleId } }
     );
-    // チャットログにも選択された称号を反映させるために更新 (最新のアクティビティを考慮)
     await ChatLog.updateMany(
       { userIp },
       { $set: { selectedTitleId: titleId, flagUrl: userNation.flagUrl } }
@@ -4984,14 +5161,13 @@ app.post("/api/selectDisplayTitle", async (req, res) => {
 
 // POST /api/grantTitleToUser (Admin/Game Logic)
 app.post("/api/grantTitleToUser", async (req, res) => {
-  // Note: This endpoint should ideally be protected by admin authentication
-  const userIp = req.userIp; // (for simplicity, we assume the caller is authorized for testing)
+  const userIp = req.userIp;
   const { targetUserIp, titleId } = req.body;
 
   if (!userIp)
     return res
       .status(401)
-      .json({ success: false, message: "IPアドレスが取得できません。" }); // Calling admin's IP
+      .json({ success: false, message: "IPアドレスが取得できません。" });
   if (!targetUserIp || targetUserIp.trim() === "")
     return res.status(400).json({
       success: false,
@@ -5003,7 +5179,10 @@ app.post("/api/grantTitleToUser", async (req, res) => {
       .json({ success: false, message: "称号IDが不正です。" });
 
   try {
-    const targetNation = await Nation.findOne({ owner: targetUserIp });
+    // 必要なフィールドをselectし、lean()を使用
+    const targetNation = await Nation.findOne({ owner: targetUserIp })
+      .select("name acquiredTitles")
+      .lean();
     if (!targetNation)
       return res
         .status(404)
@@ -5044,16 +5223,19 @@ app.post("/api/grantTitleToUser", async (req, res) => {
 
 // GET /api/gameConstants
 app.get("/api/gameConstants", (req, res) => {
-  res.json(constants); // ゲーム定数を返す
+  res.json(constants);
 });
 
 // GET /api/onlineUsers
 app.get("/api/getOnlineUserNames", async (req, res) => {
   try {
     const thirtySecondsAgo = new Date(Date.now() - 30 * 1000);
+    // 必要なフィールドのみをselectし、lean()を使用
     const onlineActivities = await UserActivity.find({
       lastSeen: { $gt: thirtySecondsAgo },
-    }).lean(); // .lean()でMongooseドキュメントを素のJavaScriptオブジェクトに変換
+    })
+      .select("userIp nationName lastSeen")
+      .lean();
 
     const onlineUserIps = onlineActivities.map((activity) => activity.userIp);
 
@@ -5082,7 +5264,10 @@ app.get("/api/getOnlineUserNames", async (req, res) => {
 // GET /api/news
 app.get("/api/news", async (req, res) => {
   try {
-    const news = await NewsLog.find({}).sort({ timestamp: -1 }).limit(50); // 最新50件
+    const news = await NewsLog.find({})
+      .sort({ timestamp: -1 })
+      .limit(50)
+      .lean(); // lean()を追加
     const formattedNews = news
       .reverse()
       .map((item) => `[${format(item.timestamp, "HH:mm:ss")}] ${item.message}`);
@@ -5101,12 +5286,13 @@ app.get("/api/news", async (req, res) => {
 // ==========================================================
 
 async function addIncomePerMinute() {
-  // 授業時間判定は定期実行では常に無効とします。
-  // ゲーム内の通常の収入生成は時間帯を考慮しない。
-  // ブラウザからのアクセス制限は `/api/checkTimeServer` で行う。
-
   try {
-    const nations = await Nation.find({});
+    // 必要なフィールドのみをselectし、lean()を使用
+    const nations = await Nation.find({})
+      .select(
+        "population territories completedFocuses railways shinkansen airports tourismFacilities"
+      )
+      .lean();
     const bulkOps = [];
 
     for (const nation of nations) {
@@ -5145,11 +5331,12 @@ async function addIncomePerMinute() {
       const baseIncome = Math.floor(nation.population * 0.01);
       const totalIncome = Math.floor(baseIncome * (1 + moneyProductionBonus));
 
-      const basePopulationGrowthRate = 0.00002;
-      const totalPopulationGrowthRate =
-        basePopulationGrowthRate + populationGrowthBonus;
+      const basePopulationGrowthFromTerritories =
+        nation.territories.length *
+        constants.BASE_POPULATION_GROWTH_PER_TERRITORY;
+
       const populationGrowth = Math.floor(
-        nation.population * totalPopulationGrowthRate
+        basePopulationGrowthFromTerritories * (1 + populationGrowthBonus)
       );
 
       if (totalIncome > 0 || populationGrowth > 0) {
@@ -5177,7 +5364,10 @@ async function addIncomePerMinute() {
 
 async function addResourcesPerMinute() {
   try {
-    const nations = await Nation.find({});
+    // 必要なフィールドのみをselectし、lean()を使用
+    const nations = await Nation.find({})
+      .select("territories completedFocuses")
+      .lean();
     const bulkOps = [];
 
     for (const nation of nations) {
@@ -5234,10 +5424,13 @@ async function addResourcesPerMinute() {
 
 async function processNationalFocusProgress() {
   try {
+    // 必要なフィールドのみをselectし、lean()を使用
     const nations = await Nation.find({
       activeFocusId: { $ne: "" },
       focusTurnsRemaining: { $gt: 0 },
-    });
+    })
+      .select("name activeFocusId focusTurnsRemaining completedFocuses")
+      .lean();
     const bulkOps = [];
 
     for (const nation of nations) {
@@ -5252,7 +5445,6 @@ async function processNationalFocusProgress() {
           );
           update.activeFocusId = "";
           update.$push = { completedFocuses: nation.activeFocusId };
-          // 直接moneyGainがある場合のみここにロジックを追加
           if (completedFocus.effects.moneyGain) {
             update.$inc = { money: completedFocus.effects.moneyGain };
           }
@@ -5271,13 +5463,15 @@ async function processNationalFocusProgress() {
   }
 }
 
-// 飛行機便処理 (processFlights)
 async function processFlights() {
   try {
-    const allNations = await Nation.find({});
-    const nationMap = new Map(allNations.map((n) => [n.owner, n])); // Map for quick lookup
+    // 必要なフィールドのみをselectし、lean()を使用
+    const allNations = await Nation.find({})
+      .select("owner population airports flights name")
+      .lean();
+    const nationMap = new Map(allNations.map((n) => [n.owner, n]));
 
-    const changes = {}; // { ip: { moneyChange, popChange } }
+    const changes = {};
 
     for (const nation of allNations) {
       if (!nation.flights || nation.flights.length === 0) continue;
@@ -5292,12 +5486,10 @@ async function processFlights() {
           nation.airports === 0 ||
           targetNation.airports === 0
         ) {
-          // 相手国が消滅、または空港がない場合、フライトを無効化（DBから削除）
-          // 実際にはflight配列からpullする必要があるが、ここではスキップ
           continue;
         }
 
-        if (nation.owner > targetNation.owner) continue; // 同じペアで2重処理を防ぐ
+        if (nation.owner > targetNation.owner) continue;
 
         if (!changes[nation.owner])
           changes[nation.owner] = { moneyChange: 0, popChange: 0 };
@@ -5357,7 +5549,7 @@ async function processFlights() {
 }
 
 cron.schedule("*/1 * * * *", async () => {
-  console.log("20分ごとに定期アップデート実行...");
+  console.log("1分ごとに定期アップデート実行...");
   await addIncomePerMinute();
   await addResourcesPerMinute();
   await processNationalFocusProgress();
@@ -5373,7 +5565,7 @@ app.get("/", (req, res) => {
 
 // サーバー起動
 app.listen(PORT, async () => {
-  await connectDB(); // サーバー起動時にDB接続
+  await connectDB();
   console.log(`サーバーがポート ${PORT} で起動しました。`);
   console.log(`http://localhost:${PORT}`);
 });
