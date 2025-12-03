@@ -2,7 +2,7 @@
 const express = require("express");
 const path = require("path");
 const mongoose = require("mongoose");
-const cron = require("node-scheduler"); // node-cronからnode-schedulerに変更されているか確認してください。もし元のままならnode-cron
+const cron = require("node-schedule"); // node-cronからnode-schedulerに変更されているか確認してください。もし元のままならnode-cron
 const { format } = require("date-fns");
 require("dotenv").config();
 
